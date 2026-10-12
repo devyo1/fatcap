@@ -29,16 +29,43 @@ h1 .dot:focus-visible{outline-offset:-.1em}
 @keyframes in{from{letter-spacing:.02em;filter:blur(6px)}to{letter-spacing:-.04em;filter:none}}
 .bottom{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;padding-top:18px;border-top:1px solid var(--bone)}
 .bottom p{margin:0;max-width:44ch;color:var(--bone)}
-form{display:flex;align-items:center;border-bottom:1px solid var(--bone);min-width:min(100%,360px)}
-form label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+#req{display:flex;align-items:center;border-bottom:1px solid var(--bone);min-width:min(100%,360px)}
+#req label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 input{flex:1;min-width:0;min-height:44px;background:transparent;border:0;color:var(--bone);font-family:var(--mono);font-size:13px;letter-spacing:.04em;outline:none}
 input::placeholder{color:var(--mute);text-transform:uppercase}
-button{min-height:44px;background:transparent;border:0;color:var(--bone);cursor:pointer;padding:0 0 0 14px}
+button{min-height:44px;background:transparent;border:0;color:var(--bone);cursor:pointer;padding:0 0 0 14px;font-family:var(--mono)}
 button:hover{color:var(--dot)}
+#req button{font-size:20px;padding:0 4px 0 18px;transition:transform .2s,color .2s}
+#req button:hover{transform:translateX(4px)}
+
+/* login drop-down */
+.top{position:relative}
+.login-btn{min-height:0;padding:0;font-size:11.5px}
+.login-btn[aria-expanded="true"]{color:var(--dot)}
+.panel{position:absolute;right:0;top:calc(100% + 12px);z-index:5;width:min(340px,calc(100vw - 2 * var(--gut)));box-sizing:border-box;
+  background:var(--ink);border:1px solid var(--bone);
+  background-image:radial-gradient(rgba(228,225,217,.09) 1.2px,transparent 1.4px);background-size:8px 8px;
+  box-shadow:8px 8px 0 rgba(0,0,0,.6)}
+.panel[hidden]{display:none}
+.panel.open{animation:drop .42s steps(7) both}
+@keyframes drop{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
+.panel.shake{animation:shake .38s cubic-bezier(.36,.07,.19,.97)}
+@keyframes shake{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
+.panel-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--bone);background:var(--ink)}
+.panel-head button{min-height:28px;padding:0 2px;font-size:16px;line-height:1}
+.panel form{display:flex;flex-direction:column;gap:14px;padding:16px 12px 14px;background:linear-gradient(var(--ink),rgba(14,14,13,.85))}
+.panel .f{display:flex;flex-direction:column;gap:2px;border-bottom:1px solid var(--mute)}
+.panel .f:focus-within{border-color:var(--bone)}
+.panel label{color:var(--mute)}
+.panel input{min-height:36px}
+.panel .go{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:4px}
+.panel .go button{padding:0 0 0 12px;font-size:18px}
+.panel .msg{color:var(--dot);min-height:1.2em}
+.panel .foot{padding:9px 12px;border-top:1px solid #3a3936;color:var(--mute);background:var(--ink)}
 :focus-visible{outline:1px solid var(--bone);outline-offset:4px}
 .note{min-height:1.2em;margin-top:8px;text-align:right;color:var(--mute)}
 @media (max-width:600px){.top .hide{display:none}.bottom{flex-direction:column;align-items:stretch}.note{text-align:left}}
-@media (prefers-reduced-motion:reduce){h1{animation:none}}
+@media (prefers-reduced-motion:reduce){h1,.panel.open{animation:none}}
 </style>
 
 <canvas id="field" aria-hidden="true"></canvas>
@@ -46,7 +73,16 @@ button:hover{color:var(--dot)}
 <div class="stage">
   <div class="top mono">
     <span class="br">fatcap.club</span>
-    <a class="br" href="#">Log in</a>
+    <button class="br mono login-btn" id="loginBtn" type="button" aria-expanded="false" aria-controls="login">Log in</button>
+    <div class="panel mono" id="login" role="dialog" aria-label="Member log in" hidden>
+      <div class="panel-head"><span class="br">Members</span><button type="button" id="loginClose" aria-label="Close">&times;</button></div>
+      <form id="loginForm" novalidate autocomplete="on">
+        <div class="f"><label for="lUser">Email or member no.</label><input id="lUser" type="text" autocomplete="username" spellcheck="false"></div>
+        <div class="f"><label for="lPass">Password</label><input id="lPass" type="password" autocomplete="current-password"></div>
+        <div class="go"><span class="msg" id="lMsg" role="status"></span><button type="submit" aria-label="Log in">&rarr;</button></div>
+      </form>
+      <div class="foot">No account? By invitation only.</div>
+    </div>
   </div>
   <div></div>
   <h1 id="mark">Fatcap<span class="dot" id="dot" role="button" tabindex="0" aria-label="Change dot color">.</span>club</h1>
@@ -56,7 +92,7 @@ button:hover{color:var(--dot)}
       <form id="req" novalidate>
         <label for="email">Email</label>
         <input id="email" type="email" autocomplete="email" placeholder="Your email">
-        <button class="mono" type="submit">Request access &rarr;</button>
+        <button type="submit" aria-label="Request access">&rarr;</button>
       </form>
       <div class="note" id="note" role="status"></div>
     </div>
@@ -73,6 +109,32 @@ let dot = null;
 try { dot = localStorage.getItem('fatcap-dot'); } catch (e) {}
 if (!DOTS.includes(dot)) { dot = DOTS[Math.random() * DOTS.length | 0]; try { localStorage.setItem('fatcap-dot', dot); } catch (e) {} }
 document.documentElement.style.setProperty('--dot', dot);
+
+/* login drop-down: not connected to accounts yet, always rejects */
+const lBtn = document.getElementById('loginBtn'), panel = document.getElementById('login'), lForm = document.getElementById('loginForm'), lMsg = document.getElementById('lMsg');
+function openLogin() {
+  panel.hidden = false; panel.classList.remove('shake'); panel.classList.add('open');
+  lBtn.setAttribute('aria-expanded', 'true'); lMsg.textContent = '';
+  setTimeout(() => document.getElementById('lUser').focus(), reduce ? 0 : 200);
+}
+function closeLogin(refocus) {
+  panel.hidden = true; panel.classList.remove('open', 'shake'); lBtn.setAttribute('aria-expanded', 'false');
+  if (refocus) lBtn.focus();
+}
+lBtn.addEventListener('click', () => panel.hidden ? openLogin() : closeLogin());
+document.getElementById('loginClose').addEventListener('click', () => closeLogin(true));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !panel.hidden) closeLogin(true); });
+document.addEventListener('pointerdown', e => { if (!panel.hidden && !panel.contains(e.target) && e.target !== lBtn) closeLogin(); });
+lForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const btn = lForm.querySelector('button[type=submit]');
+  btn.disabled = true; lMsg.textContent = 'Checking...';
+  setTimeout(() => {
+    btn.disabled = false; lMsg.textContent = 'Invalid details.';
+    document.getElementById('lPass').value = '';
+    panel.classList.remove('open', 'shake'); void panel.offsetWidth; if (!reduce) panel.classList.add('shake');
+  }, 700);
+});
 
 /* clicking the dot cycles to the next color and keeps it */
 const dotEl = document.getElementById('dot');
