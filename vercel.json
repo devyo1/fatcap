@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "echo \"static site, nothing to install\"",
-  "buildCommand": "mkdir -p public && cp index.html favicon.svg public/",
+  "buildCommand": "mkdir -p public && cp index.html favicon.svg public/ && (cp teaser.* public/ 2>/dev/null || true)",
   "outputDirectory": "public"
 }

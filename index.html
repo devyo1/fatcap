@@ -47,6 +47,12 @@ button:hover{color:var(--dot)}
 .top{position:relative}
 .login-btn{min-height:0;padding:0;font-size:11.5px}
 .login-btn[aria-expanded="true"]{color:var(--dot)}
+.rec{display:inline-block;width:.55em;height:.55em;border-radius:50%;background:var(--dot);margin-right:.5em;vertical-align:.08em;animation:rec 1.6s steps(1) infinite}
+@keyframes rec{50%{opacity:.15}}
+.panel.left{left:0;right:auto}
+.tease-img{position:relative;aspect-ratio:3/4;max-width:100%;margin:12px;border:1px solid var(--bone);overflow:hidden;background:var(--ink)}
+.tease-img img,.tease-img canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
+.tease-cap{display:flex;justify-content:space-between;padding:0 12px 12px;color:var(--mute)}
 .panel{position:absolute;right:0;top:calc(100% + 12px);z-index:5;width:min(340px,calc(100vw - 2 * var(--gut)));box-sizing:border-box;
   background:var(--ink);border:1px solid var(--bone);
   background-image:radial-gradient(rgba(228,225,217,.09) 1.2px,transparent 1.4px);background-size:8px 8px;
@@ -103,7 +109,15 @@ h1{text-shadow:-.012em 0 rgba(255,40,80,.28),.012em 0 rgba(40,170,255,.28)}
 
 <div class="stage">
   <div class="top mono">
-    <span class="br">fatcap.club</span>
+    <button class="br mono login-btn" id="teaseBtn" type="button" aria-expanded="false" aria-controls="tease"><span class="rec" aria-hidden="true"></span>001</button>
+    <div class="panel left mono" id="tease" role="dialog" aria-label="Issue 001 preview" hidden>
+      <div class="panel-head"><span class="br">001</span><button type="button" id="teaseClose" aria-label="Close">&times;</button></div>
+      <div class="tease-img">
+        <img id="teaseImg" src="teaser.jpg" alt="Issue 001 cover preview" hidden>
+        <canvas id="teaseCanvas" aria-hidden="true"></canvas>
+      </div>
+      <div class="tease-cap"><span>Issue 001</span><span>Soon</span></div>
+    </div>
     <button class="br mono login-btn" id="loginBtn" type="button" aria-expanded="false" aria-controls="login">Log in</button>
     <div class="panel mono" id="login" role="dialog" aria-label="Member log in" hidden>
       <div class="panel-head"><span class="br">Members</span><button type="button" id="loginClose" aria-label="Close">&times;</button></div>
@@ -152,6 +166,7 @@ document.documentElement.style.setProperty('--dot', dot);
 /* login drop-down: not connected to accounts yet, always rejects */
 const lBtn = document.getElementById('loginBtn'), panel = document.getElementById('login'), lForm = document.getElementById('loginForm'), lMsg = document.getElementById('lMsg');
 function openLogin() {
+  closeTease();
   panel.hidden = false; panel.classList.remove('shake'); panel.classList.add('open');
   lBtn.setAttribute('aria-expanded', 'true'); lMsg.textContent = '';
   setTimeout(() => document.getElementById('lUser').focus(), reduce ? 0 : 200);
@@ -174,6 +189,59 @@ lForm.addEventListener('submit', e => {
     panel.classList.remove('open', 'shake'); void panel.offsetWidth; if (!reduce) panel.classList.add('shake');
   }, 700);
 });
+
+/* 001 teaser: shows teaser.jpg if it exists, otherwise a generated dithered cover */
+const tBtn = document.getElementById('teaseBtn'), tease = document.getElementById('tease');
+const tImg = document.getElementById('teaseImg'), tCan = document.getElementById('teaseCanvas');
+let teaserDrawn = false;
+tImg.addEventListener('load', () => { tImg.hidden = false; tCan.hidden = true; });
+tImg.addEventListener('error', () => { tImg.remove(); });
+function drawTeaser() {
+  if (teaserDrawn || !tImg.hidden) return; teaserDrawn = true;
+  const W = 300, H = 400, src = document.createElement('canvas'); src.width = W; src.height = H;
+  const x = src.getContext('2d');
+  let seed = 7; const r = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  // wall
+  x.fillStyle = '#777'; x.fillRect(0, 0, W, H);
+  for (let y = 0, row = 0; y < H; y += 18, row++) for (let bx = (row % 2) * -28; bx < W; bx += 56) { const v = 120 + r() * 50 | 0; x.fillStyle = `rgb(${v},${v},${v})`; x.fillRect(bx + 1.5, y + 1.5, 53, 15); }
+  const lg = x.createRadialGradient(W * .25, H * .2, 10, W * .3, H * .3, W * 1.1); lg.addColorStop(0, 'rgba(255,255,255,.45)'); lg.addColorStop(1, 'rgba(0,0,0,.55)'); x.fillStyle = lg; x.fillRect(0, 0, W, H);
+  // piece: fat strokes, drips, highlights
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  for (let k = 0; k < 6; k++) { x.strokeStyle = '#111'; x.lineWidth = 22 + r() * 18; x.beginPath(); let px = 30 + k * 44, py = 200 + r() * 40; x.moveTo(px, py); for (let s = 0; s < 3; s++) x.quadraticCurveTo(px + (r() - .3) * 70, py + (r() - .5) * 130, px += 10 + r() * 22, py += (r() - .5) * 90); x.stroke(); }
+  x.fillStyle = '#111'; for (let k = 0; k < 10; k++) x.fillRect(25 + r() * 250, 240 + r() * 30, 2 + r() * 3, 20 + r() * 80);
+  x.strokeStyle = '#fff'; x.lineWidth = 4; for (let k = 0; k < 6; k++) { x.beginPath(); const hx = 40 + k * 44; x.moveTo(hx, 185 + r() * 20); x.lineTo(hx + 8, 178 + r() * 20); x.stroke(); }
+  // masthead + issue number
+  x.font = '900 64px Archivo, Impact, sans-serif'; x.textBaseline = 'top';
+  const m = 'FATCAP', mw = x.measureText(m).width, fs = 64 * (W - 24) / mw;
+  x.font = `900 ${fs}px Archivo, Impact, sans-serif`; x.lineWidth = 6; x.strokeStyle = '#000'; x.strokeText(m, 12, 10); x.fillStyle = '#fff'; x.fillText(m, 12, 10);
+  x.font = '900 120px Archivo, Impact, sans-serif'; x.textBaseline = 'alphabetic'; x.textAlign = 'right'; x.strokeText('001', W - 12, H - 16); x.fillText('001', W - 12, H - 16);
+  x.fillStyle = '#fff'; x.fillRect(12, H - 58, 62, 42); x.fillStyle = '#000'; for (let bx = 16; bx < 70; bx += 3 + (r() * 3 | 0)) x.fillRect(bx, H - 54, 1 + (r() * 2 | 0), 30);
+  // two-tone ordered dither
+  const cell = 2, w = W / cell, h = H / cell; tCan.width = w; tCan.height = h;
+  const o = tCan.getContext('2d'); o.drawImage(src, 0, 0, w, h);
+  const im = o.getImageData(0, 0, w, h), d = im.data;
+  const b2 = (a, b) => ((a & 1) ^ (b & 1)) * 2 + (b & 1);
+  for (let y = 0, i = 0; y < h; y++) for (let xx = 0; xx < w; xx++, i += 4) {
+    const bay = (b2(xx, y) * 16 + b2(xx >> 1, y >> 1) * 4 + b2(xx >> 2, y >> 2) + .5) / 64;
+    const l = ((d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11) / 255 - .5) * 1.3 + .5;
+    const on = l > bay; d[i] = on ? 228 : 14; d[i + 1] = on ? 225 : 14; d[i + 2] = on ? 217 : 13;
+  }
+  o.putImageData(im, 0, 0);
+}
+function openTease() {
+  closeLogin(); document.fonts.ready.then(drawTeaser);
+  tease.hidden = false; tease.classList.add('open'); tBtn.setAttribute('aria-expanded', 'true');
+  setTimeout(() => document.getElementById('teaseClose').focus(), reduce ? 0 : 200);
+}
+function closeTease(refocus) {
+  if (tease.hidden) return;
+  tease.hidden = true; tease.classList.remove('open'); tBtn.setAttribute('aria-expanded', 'false');
+  if (refocus) tBtn.focus();
+}
+tBtn.addEventListener('click', () => tease.hidden ? openTease() : closeTease());
+document.getElementById('teaseClose').addEventListener('click', () => closeTease(true));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTease(true); });
+document.addEventListener('pointerdown', e => { if (!tease.contains(e.target) && !tBtn.contains(e.target)) closeTease(); });
 
 /* clicking the dot cycles to the next color and keeps it */
 const dotEl = document.getElementById('dot');
