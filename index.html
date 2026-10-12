@@ -49,8 +49,8 @@ button:hover{color:var(--dot)}
 .login-btn[aria-expanded="true"]{color:var(--dot)}
 .rec{display:inline-block;width:.55em;height:.55em;border-radius:50%;background:var(--dot);margin-right:.5em;vertical-align:.08em;animation:rec 1.6s steps(1) infinite}
 @keyframes rec{50%{opacity:.15}}
-.panel.left{left:0;right:auto}
-.tease-img{position:relative;aspect-ratio:3/4;max-width:100%;margin:12px;border:1px solid var(--bone);overflow:hidden;background:var(--ink)}
+.panel.left{left:0;right:auto;width:auto;top:calc(100% + 22px)}
+.tease-img{position:relative;aspect-ratio:3/4;height:min(320px,calc(100svh - 360px));min-height:180px;margin:12px;border:1px solid var(--bone);overflow:hidden;background:var(--ink)}
 .tease-img img,.tease-img canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
 .tease-cap{display:flex;justify-content:space-between;padding:0 12px 12px;color:var(--mute)}
 .panel{position:absolute;right:0;top:calc(100% + 12px);z-index:5;width:min(340px,calc(100vw - 2 * var(--gut)));box-sizing:border-box;
@@ -201,21 +201,12 @@ function drawTeaser() {
   const W = 300, H = 400, src = document.createElement('canvas'); src.width = W; src.height = H;
   const x = src.getContext('2d');
   let seed = 7; const r = () => (seed = seed * 16807 % 2147483647) / 2147483647;
-  // wall
-  x.fillStyle = '#777'; x.fillRect(0, 0, W, H);
-  for (let y = 0, row = 0; y < H; y += 18, row++) for (let bx = (row % 2) * -28; bx < W; bx += 56) { const v = 120 + r() * 50 | 0; x.fillStyle = `rgb(${v},${v},${v})`; x.fillRect(bx + 1.5, y + 1.5, 53, 15); }
-  const lg = x.createRadialGradient(W * .25, H * .2, 10, W * .3, H * .3, W * 1.1); lg.addColorStop(0, 'rgba(255,255,255,.45)'); lg.addColorStop(1, 'rgba(0,0,0,.55)'); x.fillStyle = lg; x.fillRect(0, 0, W, H);
-  // piece: fat strokes, drips, highlights
-  x.lineCap = 'round'; x.lineJoin = 'round';
-  for (let k = 0; k < 6; k++) { x.strokeStyle = '#111'; x.lineWidth = 22 + r() * 18; x.beginPath(); let px = 30 + k * 44, py = 200 + r() * 40; x.moveTo(px, py); for (let s = 0; s < 3; s++) x.quadraticCurveTo(px + (r() - .3) * 70, py + (r() - .5) * 130, px += 10 + r() * 22, py += (r() - .5) * 90); x.stroke(); }
-  x.fillStyle = '#111'; for (let k = 0; k < 10; k++) x.fillRect(25 + r() * 250, 240 + r() * 30, 2 + r() * 3, 20 + r() * 80);
-  x.strokeStyle = '#fff'; x.lineWidth = 4; for (let k = 0; k < 6; k++) { x.beginPath(); const hx = 40 + k * 44; x.moveTo(hx, 185 + r() * 20); x.lineTo(hx + 8, 178 + r() * 20); x.stroke(); }
-  // masthead + issue number
-  x.font = '900 64px Archivo, Impact, sans-serif'; x.textBaseline = 'top';
-  const m = 'FATCAP', mw = x.measureText(m).width, fs = 64 * (W - 24) / mw;
-  x.font = `900 ${fs}px Archivo, Impact, sans-serif`; x.lineWidth = 6; x.strokeStyle = '#000'; x.strokeText(m, 12, 10); x.fillStyle = '#fff'; x.fillText(m, 12, 10);
-  x.font = '900 120px Archivo, Impact, sans-serif'; x.textBaseline = 'alphabetic'; x.textAlign = 'right'; x.strokeText('001', W - 12, H - 16); x.fillText('001', W - 12, H - 16);
-  x.fillStyle = '#fff'; x.fillRect(12, H - 58, 62, 42); x.fillStyle = '#000'; for (let bx = 16; bx < 70; bx += 3 + (r() * 3 | 0)) x.fillRect(bx, H - 54, 1 + (r() * 2 | 0), 30);
+  // quiet cover: soft spray haze on a dark-to-light ground, small masthead and number
+  const bg = x.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#141414'); bg.addColorStop(1, '#262626'); x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  const haze = x.createRadialGradient(W * .55, H * .52, 4, W * .55, H * .52, W * .62); haze.addColorStop(0, 'rgba(255,255,255,.95)'); haze.addColorStop(.35, 'rgba(255,255,255,.4)'); haze.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = haze; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#fff'; x.textBaseline = 'top'; x.font = '900 34px Archivo, Impact, sans-serif'; x.fillText('FATCAP', 16, 16);
+  x.textBaseline = 'alphabetic'; x.textAlign = 'right'; x.font = '900 30px Archivo, Impact, sans-serif'; x.fillText('001', W - 16, H - 16);
   // two-tone ordered dither
   const cell = 2, w = W / cell, h = H / cell; tCan.width = w; tCan.height = h;
   const o = tCan.getContext('2d'); o.drawImage(src, 0, 0, w, h);
