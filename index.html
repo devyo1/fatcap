@@ -1,3 +1,7 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E0E0D">
 <title>fatcap.club</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -65,7 +69,20 @@ button:hover{color:var(--dot)}
 .panel .foot{padding:9px 12px;border-top:1px solid #3a3936;color:var(--mute);background:var(--ink)}
 :focus-visible{outline:1px solid var(--bone);outline-offset:4px}
 .note{min-height:1.2em;margin-top:8px;text-align:right;color:var(--mute)}
-@media (max-width:600px){.top .hide{display:none}.bottom{flex-direction:column;align-items:stretch}.note{text-align:left}}
+br.m{display:none}
+@media (max-width:700px){
+  /* phone: wordmark on two lines, each as wide as the screen allows */
+  br.m{display:inline}
+  h1{line-height:.84;text-align:right}
+  .mono{font-size:13px}
+  .bottom{flex-direction:column;align-items:stretch;gap:22px;padding-top:20px}
+  .bottom p{font-size:13px}
+  input{font-size:16px;min-height:52px}
+  #req button{font-size:26px;min-height:52px}
+  .note{text-align:left}
+  .login-btn{font-size:13px;min-height:44px}
+  .top{align-items:center}
+}
 /* film grain + light CRT: all overlays, never catch clicks */
 .fx{position:fixed;inset:0;pointer-events:none;z-index:50}
 .grain{inset:-100%;width:300%;height:300%;opacity:.085;animation:grain .6s steps(5) infinite}
@@ -98,7 +115,7 @@ h1{text-shadow:-.012em 0 rgba(255,40,80,.28),.012em 0 rgba(40,170,255,.28)}
     </div>
   </div>
   <div></div>
-  <h1 id="mark">Fatcap<span class="dot" id="dot" role="button" tabindex="0" aria-label="Change dot color">.</span>club</h1>
+  <h1 id="mark">Fatcap<br class="m"><span class="dot" id="dot" role="button" tabindex="0" aria-label="Change dot color">.</span>club</h1>
   <div class="bottom mono">
     <p>Graffiti / Skateboarding / Lifestyle</p>
     <div>
