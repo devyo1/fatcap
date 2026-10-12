@@ -1,4 +1,4 @@
-export const CITY = process.env.NEXT_PUBLIC_CITY || 'City';
+export const CITY = process.env.NEXT_PUBLIC_CITY || 'Montreal';
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://fatcap.club').replace(/\/$/, '');
 
 export const BOARDS = [
