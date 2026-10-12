@@ -2,7 +2,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 // Light formatting for posts and messages, built from React elements (never raw HTML):
-//   blank line = new paragraph, "> " = quote, URLs become links, @name links a member, **bold**.
+//   blank line = new paragraph, "> " = quote, URLs become links, @name links a member, **bold**,
+//   and a line that is only an image link shows the image.
 const TOKEN = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]!?])|(^|[^A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_.-]{1,19}[A-Za-z0-9_])|\*\*([^*\n]+)\*\*/g;
 
 function inline(text: string, key: string): ReactNode[] {
@@ -30,9 +31,15 @@ function lines(block: string[], key: string) {
   return block.flatMap((l, j) => (j ? [<br key={`${key}-br${j}`} />, ...inline(l, `${key}-${j}`)] : inline(l, `${key}-${j}`)));
 }
 
+const IMAGE = /^https?:\/\/\S+\.(?:jpe?g|png|gif|webp|avif)(?:\?\S*)?$/i;
+
 export default function RichText({ text, className = 'body' }: { text: string; className?: string }) {
-  const blocks: { quote: boolean; lines: string[] }[] = [];
+  const blocks: { quote: boolean; lines: string[]; img?: string }[] = [];
   for (const raw of text.replace(/\r\n/g, '\n').split('\n')) {
+    if (IMAGE.test(raw.trim())) {
+      blocks.push({ quote: false, lines: [raw.trim()], img: raw.trim() }, { quote: false, lines: [] });
+      continue;
+    }
     const quote = /^\s*>/.test(raw);
     const line = quote ? raw.replace(/^\s*>\s?/, '') : raw;
     const cur = blocks[blocks.length - 1];
@@ -43,7 +50,12 @@ export default function RichText({ text, className = 'body' }: { text: string; c
   return (
     <div className={className}>
       {blocks.filter((b) => b.lines.length).map((b, k) =>
-        b.quote ? <blockquote key={k}>{lines(b.lines, `q${k}`)}</blockquote> : <p key={k}>{lines(b.lines, `p${k}`)}</p>,
+        b.img ? (
+          <a key={k} className="pic" href={b.img} target="_blank" rel="noopener noreferrer nofollow">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={b.img} alt="" loading="lazy" referrerPolicy="no-referrer" />
+          </a>
+        ) : b.quote ? <blockquote key={k}>{lines(b.lines, `q${k}`)}</blockquote> : <p key={k}>{lines(b.lines, `p${k}`)}</p>,
       )}
     </div>
   );

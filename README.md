@@ -31,6 +31,14 @@ node scripts/create-user.mjs <username> <password> [--admin]
 
 Uses `DATABASE_URL` (or `LOCAL_DB`). If the username exists, it resets the password.
 
+## Mock content
+
+```bash
+node scripts/seed-mock.mjs
+```
+
+Adds six flagged mock members with threads, comments and props so the forum doesn't look empty. Remove it all from Admin -> Overview -> Remove all mock content.
+
 ## Local development
 
 ```bash

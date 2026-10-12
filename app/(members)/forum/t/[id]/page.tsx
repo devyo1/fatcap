@@ -6,6 +6,7 @@ import { CITY, LIMITS, boardBySlug } from '@/lib/config';
 import { ago } from '@/lib/format';
 import { reply, deletePost, deleteThread, editPost, editThread, toggleProps, setThreadFlag } from '@/app/actions';
 import RichText from '@/components/RichText';
+import Avatar from '@/components/Avatar';
 import Notice from '@/components/Notice';
 
 type Thread = {
@@ -67,6 +68,7 @@ function Comment({ post, kids, depth, me, threadId, locked }: { post: Post; kids
   return (
     <div className="comment" id={`p${post.id}`}>
       <header className="mono">
+        <Avatar name={post.author} size={22} />
         <Author name={post.author} />
         <a className="when" href={`#p${post.id}`}>{ago(post.created_at)}</a>
         {post.edited_at && <span className="mute">edited</span>}
@@ -178,6 +180,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
 
       <article className="op">
         <header className="mono">
+          <Avatar name={thread.author} size={30} />
           <Author name={thread.author} /><span>{ago(thread.created_at)}</span>
           {thread.edited_at && <span className="mute">edited</span>}
         </header>

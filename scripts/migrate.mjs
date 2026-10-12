@@ -125,6 +125,11 @@ const statements = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS notifications_member_idx ON notifications (member_id, created_at DESC)`,
+
+  // v3: moderation + removable mock content
+  `ALTER TABLE members ADD COLUMN IF NOT EXISTS ban_reason text`,
+  `ALTER TABLE members ADD COLUMN IF NOT EXISTS banned_at timestamptz`,
+  `ALTER TABLE members ADD COLUMN IF NOT EXISTS is_mock boolean NOT NULL DEFAULT false`,
 ];
 
 for (const s of statements) await exec(s);

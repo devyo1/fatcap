@@ -277,7 +277,7 @@ export async function makeStickers(form: FormData) {
   const admin = await requireAdmin();
   const count = Math.floor(Number(form.get('count')));
   const batch = str(form.get('batch')).trim().slice(0, 40) || new Date().toISOString().slice(0, 10);
-  if (!(count >= 1 && count <= 200)) back('/admin', 'Make between 1 and 200 at a time.');
+  if (!(count >= 1 && count <= 200)) back('/admin?tab=stickers', 'Make between 1 and 200 at a time.');
   await createStickerBatch(batch, count, admin.id);
   redirect(`/admin/sheet/${encodeURIComponent(batch)}`);
 }
@@ -285,16 +285,16 @@ export async function makeStickers(form: FormData) {
 export async function revokeInvite(form: FormData) {
   await requireAdmin();
   await q('UPDATE invites SET revoked = true WHERE id = $1 AND used_at IS NULL', [Number(form.get('id'))]);
-  redirect(str(form.get('back')) || '/admin');
+  redirect(safeBack(str(form.get('back'))));
 }
 
 export async function toggleBan(form: FormData) {
   const admin = await requireAdmin();
   const id = Number(form.get('id'));
-  if (id === admin.id) back('/admin', "You can't ban yourself.");
+  if (id === admin.id) back('/admin?tab=members', "You can't ban yourself.");
   await q('UPDATE members SET banned = NOT banned WHERE id = $1 AND NOT is_admin', [id]);
   await q('DELETE FROM sessions WHERE user_id = $1 AND (SELECT banned FROM members WHERE id = $1)', [id]);
-  redirect('/admin#members');
+  redirect('/admin?tab=members');
 }
 
 export async function resetPassword(form: FormData) {
@@ -305,5 +305,5 @@ export async function resetPassword(form: FormData) {
   await q('DELETE FROM sessions WHERE user_id = $1', [id]);
   // Shown once on the admin page, never put in a URL.
   (await cookies()).set('fc_flash', JSON.stringify({ user: user?.username, temp }), { httpOnly: true, sameSite: 'lax', path: '/admin', maxAge: 60 });
-  redirect('/admin#members');
+  redirect('/admin?tab=members');
 }

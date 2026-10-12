@@ -8,6 +8,7 @@ import { boardBySlug } from '@/lib/config';
 import { changePassword } from '@/app/actions';
 import { CopyButton } from '@/components/Buttons';
 import Notice from '@/components/Notice';
+import Avatar from '@/components/Avatar';
 
 type Profile = {
   id: number; username: string; created_at: string; last_seen_at: string | null; is_admin: boolean;
@@ -66,11 +67,14 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   return (
     <>
       <div className="head">
-        <div>
+        <div className="who-head">
+          <Avatar name={p.username} size={72} />
+          <div>
           <h1 className="wide h1" style={{ overflowWrap: 'anywhere' }}>{p.username}</h1>
           <p className="sub mono mute">
             Joined {date(p.created_at)}{via ? <> / {via}</> : null}{p.last_seen_at ? <> / Seen {ago(p.last_seen_at)}</> : null}
           </p>
+          </div>
         </div>
         <div className="actions">
           {p.is_admin && <span className="pill on">Admin</span>}
