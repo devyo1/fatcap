@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0E0E0D">
 <title>fatcap.club</title>
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -113,7 +113,7 @@ h1{text-shadow:-.012em 0 rgba(255,40,80,.28),.012em 0 rgba(40,170,255,.28)}
     <div class="panel left mono" id="tease" role="dialog" aria-label="Issue 001 preview" hidden>
       <div class="panel-head"><span class="br">001</span><button type="button" id="teaseClose" aria-label="Close">&times;</button></div>
       <div class="tease-img">
-        <img id="teaseImg" src="teaser.jpg" alt="Issue 001 cover preview" hidden>
+        <img id="teaseImg" src="/teaser.jpg" alt="Issue 001 cover preview" hidden>
         <canvas id="teaseCanvas" aria-hidden="true"></canvas>
       </div>
       <div class="tease-cap"><span>Issue 001</span><span>Soon</span></div>
@@ -122,7 +122,7 @@ h1{text-shadow:-.012em 0 rgba(255,40,80,.28),.012em 0 rgba(40,170,255,.28)}
     <div class="panel mono" id="login" role="dialog" aria-label="Member log in" hidden>
       <div class="panel-head"><span class="br">Members</span><button type="button" id="loginClose" aria-label="Close">&times;</button></div>
       <form id="loginForm" novalidate autocomplete="on">
-        <div class="f"><label for="lUser">Email or member no.</label><input id="lUser" type="text" autocomplete="username" spellcheck="false"></div>
+        <div class="f"><label for="lUser">Username</label><input id="lUser" type="text" autocomplete="username" spellcheck="false"></div>
         <div class="f"><label for="lPass">Password</label><input id="lPass" type="password" autocomplete="current-password"></div>
         <div class="go"><span class="msg" id="lMsg" role="status"></span><button type="submit" aria-label="Log in">&rarr;</button></div>
       </form>
@@ -179,16 +179,29 @@ lBtn.addEventListener('click', () => panel.hidden ? openLogin() : closeLogin());
 document.getElementById('loginClose').addEventListener('click', () => closeLogin(true));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !panel.hidden) closeLogin(true); });
 document.addEventListener('pointerdown', e => { if (!panel.hidden && !panel.contains(e.target) && e.target !== lBtn) closeLogin(); });
-lForm.addEventListener('submit', e => {
+lForm.addEventListener('submit', async e => {
   e.preventDefault();
   const btn = lForm.querySelector('button[type=submit]');
+  const username = document.getElementById('lUser').value.trim(), password = document.getElementById('lPass').value;
   btn.disabled = true; lMsg.textContent = 'Checking...';
-  setTimeout(() => {
-    btn.disabled = false; lMsg.textContent = 'Invalid details.';
-    document.getElementById('lPass').value = '';
-    panel.classList.remove('open', 'shake'); void panel.offsetWidth; if (!reduce) panel.classList.add('shake');
-  }, 700);
+  try {
+    const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) { lMsg.textContent = 'In.'; location.href = data.next || '/forum'; return; }
+  } catch (err) { console.error('Login failed:', err); }
+  btn.disabled = false; lMsg.textContent = 'Invalid details.';
+  document.getElementById('lPass').value = '';
+  panel.classList.remove('open', 'shake'); void panel.offsetWidth; if (!reduce) panel.classList.add('shake');
 });
+
+/* already signed in: the login button goes straight in */
+fetch('/api/me').then(r => r.ok ? r.json() : null).then(d => {
+  if (!d || !d.user) return;
+  const enter = document.createElement('a');
+  enter.className = lBtn.className; enter.href = '/forum'; enter.textContent = 'Enter';
+  enter.style.textDecoration = 'none'; enter.style.color = 'inherit';
+  lBtn.replaceWith(enter);
+}).catch(() => {});
 
 /* 001 teaser: shows teaser.jpg if it exists, otherwise a generated dithered cover */
 const tBtn = document.getElementById('teaseBtn'), tease = document.getElementById('tease');
