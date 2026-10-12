@@ -70,20 +70,17 @@ button:hover{color:var(--dot)}
 .fx{position:fixed;inset:0;pointer-events:none;z-index:50}
 .grain{inset:-100%;width:300%;height:300%;opacity:.085;animation:grain .6s steps(5) infinite}
 @keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-11%,7%)}40%{transform:translate(8%,-13%)}60%{transform:translate(-6%,-4%)}80%{transform:translate(13%,10%)}100%{transform:translate(0,0)}}
-.scan{background:repeating-linear-gradient(to bottom,rgba(0,0,0,.22) 0 1px,transparent 1px 3px);mix-blend-mode:multiply}
-.roll{background:linear-gradient(to bottom,transparent,rgba(228,225,217,.035) 45%,rgba(228,225,217,.06) 50%,rgba(228,225,217,.035) 55%,transparent);height:28vh;inset:auto 0 auto 0;top:-30vh;animation:roll 9s linear infinite}
-@keyframes roll{to{transform:translateY(160vh)}}
+.scan{background:repeating-linear-gradient(to bottom,rgba(0,0,0,.09) 0 1px,transparent 1px 4px);mix-blend-mode:multiply}
 .vig{background:radial-gradient(120% 95% at 50% 50%,transparent 55%,rgba(0,0,0,.6) 100%)}
 .stage{animation:flick 4s steps(1) infinite}
 @keyframes flick{0%,100%{opacity:1}31%{opacity:.965}32%{opacity:1}67%{opacity:.98}68%{opacity:1}}
 h1{text-shadow:-.012em 0 rgba(255,40,80,.28),.012em 0 rgba(40,170,255,.28)}
-@media (prefers-reduced-motion:reduce){h1,.panel.open,.grain,.roll,.stage{animation:none}.roll{display:none}}
+@media (prefers-reduced-motion:reduce){h1,.panel.open,.grain,.stage{animation:none}}
 </style>
 
 <canvas id="field" aria-hidden="true"></canvas>
 <div class="fx grain" id="grain" aria-hidden="true"></div>
 <div class="fx scan" aria-hidden="true"></div>
-<div class="fx roll" aria-hidden="true"></div>
 <div class="fx vig" aria-hidden="true"></div>
 
 <div class="stage">
