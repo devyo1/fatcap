@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="body" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#9E9B93"/>
+      <stop offset=".35" stop-color="#F2F0EA"/>
+      <stop offset=".7" stop-color="#D9D6CE"/>
+      <stop offset="1" stop-color="#8F8C84"/>
+    </linearGradient>
+    <radialGradient id="top" cx=".45" cy=".4" r=".7">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D2CFC6"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0E0E0D"/>
+  <!-- valve stem -->
+  <rect x="28" y="40" width="8" height="15" rx="1" fill="#6E6C66"/>
+  <!-- wide fat-cap body -->
+  <path d="M11 22v15a21 7.5 0 0 0 42 0V22z" fill="url(#body)"/>
+  <!-- top face with the dished rim -->
+  <ellipse cx="32" cy="22" rx="21" ry="7.5" fill="url(#top)"/>
+  <ellipse cx="32" cy="22.6" rx="14" ry="4.4" fill="none" stroke="#B9B6AD" stroke-width="1.6"/>
+  <!-- big NY-style nozzle hole -->
+  <ellipse cx="32" cy="32.5" rx="5.6" ry="4.6" fill="#B9B6AD"/>
+  <ellipse cx="32" cy="32.8" rx="4" ry="3.3" fill="#0E0E0D"/>
+</svg>
