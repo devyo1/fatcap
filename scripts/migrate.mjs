@@ -17,7 +17,7 @@ if (process.env.LOCAL_DB) {
 }
 
 const statements = [
-  `CREATE TABLE IF NOT EXISTS users (
+  `CREATE TABLE IF NOT EXISTS members (
     id            serial PRIMARY KEY,
     username      text NOT NULL,
     username_key  text NOT NULL UNIQUE,
@@ -33,8 +33,8 @@ const statements = [
     code       text NOT NULL UNIQUE,
     kind       text NOT NULL CHECK (kind IN ('sticker', 'member', 'setup')),
     batch      text,
-    created_by integer REFERENCES users(id) ON DELETE SET NULL,
-    used_by    integer REFERENCES users(id) ON DELETE SET NULL,
+    created_by integer REFERENCES members(id) ON DELETE SET NULL,
+    used_by    integer REFERENCES members(id) ON DELETE SET NULL,
     used_at    timestamptz,
     revoked    boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now()
@@ -43,7 +43,7 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS invites_created_by_idx ON invites (created_by)`,
   `CREATE TABLE IF NOT EXISTS sessions (
     token_hash text PRIMARY KEY,
-    user_id    integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id    integer NOT NULL REFERENCES members(id) ON DELETE CASCADE,
     created_at timestamptz NOT NULL DEFAULT now(),
     expires_at timestamptz NOT NULL
   )`,
@@ -52,7 +52,7 @@ const statements = [
     id           serial PRIMARY KEY,
     city         text NOT NULL,
     board        text NOT NULL,
-    user_id      integer REFERENCES users(id) ON DELETE SET NULL,
+    user_id      integer REFERENCES members(id) ON DELETE SET NULL,
     title        text NOT NULL,
     body         text NOT NULL,
     reply_count  integer NOT NULL DEFAULT 0,
@@ -65,7 +65,7 @@ const statements = [
   `CREATE TABLE IF NOT EXISTS posts (
     id         serial PRIMARY KEY,
     thread_id  integer NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
-    user_id    integer REFERENCES users(id) ON DELETE SET NULL,
+    user_id    integer REFERENCES members(id) ON DELETE SET NULL,
     body       text NOT NULL,
     deleted    boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now()

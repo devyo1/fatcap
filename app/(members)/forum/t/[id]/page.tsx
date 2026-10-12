@@ -26,13 +26,13 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
   if (!Number.isInteger(id)) notFound();
 
   const thread = await one<Thread>(
-    `SELECT t.*, u.username AS author FROM threads t LEFT JOIN users u ON u.id = t.user_id WHERE t.id = $1 AND NOT t.deleted`,
+    `SELECT t.*, u.username AS author FROM threads t LEFT JOIN members u ON u.id = t.user_id WHERE t.id = $1 AND NOT t.deleted`,
     [id],
   );
   if (!thread) notFound();
   const posts = await q<Post>(
     `SELECT p.id, p.body, p.user_id, u.username AS author, p.created_at
-       FROM posts p LEFT JOIN users u ON u.id = p.user_id
+       FROM posts p LEFT JOIN members u ON u.id = p.user_id
       WHERE p.thread_id = $1 AND NOT p.deleted ORDER BY p.created_at`,
     [id],
   );

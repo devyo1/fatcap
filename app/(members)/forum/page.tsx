@@ -17,7 +17,7 @@ export default async function Forum({ searchParams }: { searchParams: Promise<{ 
     ),
     q<ThreadRow>(
       `SELECT t.id, t.title, t.board, u.username AS author, t.reply_count, t.last_post_at
-         FROM threads t LEFT JOIN users u ON u.id = t.user_id
+         FROM threads t LEFT JOIN members u ON u.id = t.user_id
         WHERE t.city = $1 AND NOT t.deleted
         ORDER BY t.last_post_at DESC LIMIT 15`,
       [CITY],

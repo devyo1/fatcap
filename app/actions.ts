@@ -26,7 +26,7 @@ export async function logout() {
 async function createMember(username: string, password: string, inviteId: number, isAdmin = false) {
   const hash = await hashPassword(password);
   const user = await one<{ id: number }>(
-    `INSERT INTO users (username, username_key, password_hash, invited_via, is_admin)
+    `INSERT INTO members (username, username_key, password_hash, invited_via, is_admin)
      VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (username_key) DO NOTHING RETURNING id`,
     [username.trim(), usernameKey(username), hash, inviteId, isAdmin],
@@ -42,7 +42,7 @@ export async function redeemInvite(form: FormData) {
 
   const bad = checkUsername(username) ?? checkNewPassword(password, str(form.get('confirm')));
   if (bad) back(path, bad);
-  if (await one('SELECT 1 FROM users WHERE username_key = $1', [usernameKey(username)])) back(path, 'That username is taken.');
+  if (await one('SELECT 1 FROM members WHERE username_key = $1', [usernameKey(username)])) back(path, 'That username is taken.');
 
   // Claim the invite first. Only one person can win this update.
   const claim = await one<{ id: number }>(
@@ -67,7 +67,7 @@ export async function setupAdmin(form: FormData) {
   const expected = process.env.SETUP_TOKEN;
   const path = `/setup?token=${encodeURIComponent(token)}`;
   if (!expected || token !== expected) redirect('/');
-  if (await one('SELECT 1 FROM users LIMIT 1')) redirect('/');
+  if (await one('SELECT 1 FROM members LIMIT 1')) redirect('/');
 
   const username = str(form.get('username'));
   const password = str(form.get('password'));
@@ -146,12 +146,12 @@ export async function deletePost(form: FormData) {
 export async function changePassword(form: FormData) {
   const me = await requireUser();
   const path = `/u/${encodeURIComponent(me.username)}`;
-  const row = await one<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = $1', [me.id]);
+  const row = await one<{ password_hash: string }>('SELECT password_hash FROM members WHERE id = $1', [me.id]);
   if (!row || !(await checkPassword(str(form.get('current')), row.password_hash))) back(path, 'Current password is wrong.');
   const next = str(form.get('password'));
   const bad = checkNewPassword(next, str(form.get('confirm')));
   if (bad) back(path, bad);
-  await q('UPDATE users SET password_hash = $1 WHERE id = $2', [await hashPassword(next), me.id]);
+  await q('UPDATE members SET password_hash = $1 WHERE id = $2', [await hashPassword(next), me.id]);
   redirect(`${path}?saved=1`);
 }
 
@@ -176,8 +176,8 @@ export async function toggleBan(form: FormData) {
   const admin = await requireAdmin();
   const id = Number(form.get('id'));
   if (id === admin.id) back('/admin', "You can't ban yourself.");
-  await q('UPDATE users SET banned = NOT banned WHERE id = $1 AND NOT is_admin', [id]);
-  await q('DELETE FROM sessions WHERE user_id = $1 AND (SELECT banned FROM users WHERE id = $1)', [id]);
+  await q('UPDATE members SET banned = NOT banned WHERE id = $1 AND NOT is_admin', [id]);
+  await q('DELETE FROM sessions WHERE user_id = $1 AND (SELECT banned FROM members WHERE id = $1)', [id]);
   redirect('/admin#members');
 }
 
@@ -185,7 +185,7 @@ export async function resetPassword(form: FormData) {
   await requireAdmin();
   const id = Number(form.get('id'));
   const temp = randomBytes(6).toString('base64url');
-  const user = await one<{ username: string }>('UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING username', [await hashPassword(temp), id]);
+  const user = await one<{ username: string }>('UPDATE members SET password_hash = $1 WHERE id = $2 RETURNING username', [await hashPassword(temp), id]);
   await q('DELETE FROM sessions WHERE user_id = $1', [id]);
   // Shown once on the admin page, never put in a URL.
   (await cookies()).set('fc_flash', JSON.stringify({ user: user?.username, temp }), { httpOnly: true, sameSite: 'lax', path: '/admin', maxAge: 60 });

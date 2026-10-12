@@ -50,9 +50,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
               CASE WHEN i.kind = 'member' THEN i.created_by END AS inviter_id, inv.username AS inviter,
               (SELECT count(*)::int FROM threads WHERE user_id = u.id AND NOT deleted) AS threads,
               (SELECT count(*)::int FROM posts WHERE user_id = u.id AND NOT deleted) AS replies
-         FROM users u
+         FROM members u
          LEFT JOIN invites i ON i.id = u.invited_via
-         LEFT JOIN users inv ON inv.id = i.created_by AND i.kind = 'member'
+         LEFT JOIN members inv ON inv.id = i.created_by AND i.kind = 'member'
         ORDER BY u.created_at`,
     ),
   ]);

@@ -31,9 +31,9 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
             (SELECT count(*)::int FROM threads WHERE user_id = u.id AND NOT deleted) AS threads,
             (SELECT count(*)::int FROM posts WHERE user_id = u.id AND NOT deleted) AS replies,
             (SELECT count(*)::int FROM invites WHERE created_by = u.id AND kind = 'member' AND used_by IS NOT NULL) AS invited
-       FROM users u
+       FROM members u
        LEFT JOIN invites i ON i.id = u.invited_via
-       LEFT JOIN users inv ON inv.id = i.created_by AND i.kind = 'member'
+       LEFT JOIN members inv ON inv.id = i.created_by AND i.kind = 'member'
       WHERE u.username_key = $1 AND NOT u.banned`,
     [usernameKey(name)],
   );

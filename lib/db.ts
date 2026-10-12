@@ -9,7 +9,10 @@ async function runner(): Promise<Runner> {
   // LOCAL_DB=./.localdb runs an in-process Postgres (PGlite) for development without Neon.
   if (process.env.LOCAL_DB && process.env.NODE_ENV !== 'production') {
     const { PGlite } = await import('@electric-sql/pglite');
-    const pg = new PGlite(process.env.LOCAL_DB);
+    // One instance per process: dev mode loads this module more than once, and two
+    // PGlite instances on the same folder corrupt each other.
+    const g = globalThis as unknown as { __fcPglite?: InstanceType<typeof PGlite> };
+    const pg = (g.__fcPglite ??= new PGlite(process.env.LOCAL_DB));
     return (run = async (text, params) => (await pg.query(text, params)).rows);
   }
   const url = process.env.DATABASE_URL;

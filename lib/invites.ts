@@ -43,7 +43,7 @@ export async function findInvite(code: string) {
 export async function memberInvite(userId: number) {
   const existing = await one<Invite & { used_by_name: string | null }>(
     `SELECT i.*, u.username AS used_by_name
-       FROM invites i LEFT JOIN users u ON u.id = i.used_by
+       FROM invites i LEFT JOIN members u ON u.id = i.used_by
       WHERE i.kind = 'member' AND i.created_by = $1
       ORDER BY i.id LIMIT 1`,
     [userId],

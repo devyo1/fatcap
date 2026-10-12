@@ -13,7 +13,7 @@ export default async function Board({ params }: { params: Promise<{ board: strin
   if (!board) notFound();
   const rows = await q<ThreadRow>(
     `SELECT t.id, t.title, t.board, u.username AS author, t.reply_count, t.last_post_at
-       FROM threads t LEFT JOIN users u ON u.id = t.user_id
+       FROM threads t LEFT JOIN members u ON u.id = t.user_id
       WHERE t.city = $1 AND t.board = $2 AND NOT t.deleted
       ORDER BY t.last_post_at DESC LIMIT 100`,
     [CITY, board.slug],

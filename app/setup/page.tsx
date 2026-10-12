@@ -12,7 +12,7 @@ export default async function Setup({ searchParams }: { searchParams: Promise<{ 
   const { token, error } = await searchParams;
   const expected = process.env.SETUP_TOKEN;
   if (!expected || token !== expected) notFound();
-  if (await one('SELECT 1 FROM users LIMIT 1')) notFound();
+  if (await one('SELECT 1 FROM members LIMIT 1')) notFound();
 
   return (
     <div className="gate">

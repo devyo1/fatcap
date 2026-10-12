@@ -62,11 +62,11 @@ export async function currentUser(): Promise<User | null> {
   if (!token) return null;
   const user = await one<User>(
     `SELECT u.id, u.username, u.is_admin, u.created_at
-       FROM sessions s JOIN users u ON u.id = s.user_id
+       FROM sessions s JOIN members u ON u.id = s.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now() AND NOT u.banned`,
     [sha(token)],
   );
-  if (user) q('UPDATE users SET last_seen_at = now() WHERE id = $1', [user.id]).catch(() => {});
+  if (user) q('UPDATE members SET last_seen_at = now() WHERE id = $1', [user.id]).catch(() => {});
   return user;
 }
 
@@ -85,7 +85,7 @@ export async function requireAdmin(): Promise<User> {
 /** Username + password check. Returns the user id, or null. */
 export async function verifyLogin(username: string, password: string): Promise<number | null> {
   const row = await one<{ id: number; password_hash: string; banned: boolean }>(
-    'SELECT id, password_hash, banned FROM users WHERE username_key = $1',
+    'SELECT id, password_hash, banned FROM members WHERE username_key = $1',
     [usernameKey(username)],
   );
   // Compare against a dummy hash when the user doesn't exist so timing doesn't leak it.
