@@ -23,6 +23,14 @@ Tables are created automatically on every build (`scripts/migrate.mjs`, safe to 
 
 After the first deploy with the variables set, open `https://fatcap.club/setup?token=<SETUP_TOKEN>` and create your account. That page only works while there are no members.
 
+## Making an account by hand
+
+```bash
+node scripts/create-user.mjs <username> <password> [--admin]
+```
+
+Uses `DATABASE_URL` (or `LOCAL_DB`). If the username exists, it resets the password.
+
 ## Local development
 
 ```bash

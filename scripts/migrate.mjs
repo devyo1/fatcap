@@ -2,12 +2,13 @@
 // Every statement is idempotent, so running it again is safe.
 import { neon } from '@neondatabase/serverless';
 
-let exec;
+let exec, close = async () => {};
 if (process.env.LOCAL_DB) {
   // Local development database (PGlite), see lib/db.ts.
   const { PGlite } = await import('@electric-sql/pglite');
   const pg = new PGlite(process.env.LOCAL_DB);
   exec = (s) => pg.query(s);
+  close = () => pg.close();
 } else if (process.env.DATABASE_URL) {
   const sql = neon(process.env.DATABASE_URL);
   exec = (s) => sql.query(s);
@@ -75,4 +76,5 @@ const statements = [
 ];
 
 for (const s of statements) await exec(s);
+await close();
 console.log(`[migrate] ok (${statements.length} statements)`);
