@@ -28,10 +28,10 @@ body{background:var(--ink);color:var(--bone);font-family:var(--sans)}
 .top{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .top a{color:inherit;text-decoration:none}
 .top a:hover{text-decoration:line-through}
-h1{margin:0;align-self:end;white-space:nowrap;font-variation-settings:"wdth" 125;font-weight:900;text-transform:uppercase;letter-spacing:-.04em;line-height:.76;font-size:15.6vw;padding-bottom:.05em;animation:in 1.4s cubic-bezier(.2,.8,.1,1) both}
+h1{margin:0;align-self:end;white-space:nowrap;font-variation-settings:"wdth" 125;font-weight:900;text-transform:uppercase;letter-spacing:-.04em;line-height:.76;font-size:15.6vw;padding-bottom:.05em;padding-right:.04em;text-align:center;animation:in 1.4s cubic-bezier(.2,.8,.1,1) both}
 h1 .dot{color:var(--dot);cursor:pointer;transition:color .25s;-webkit-tap-highlight-color:transparent}
 h1 .dot:focus-visible{outline-offset:-.1em}
-@keyframes in{from{letter-spacing:.02em;filter:blur(6px)}to{letter-spacing:-.04em;filter:none}}
+@keyframes in{from{opacity:0;filter:blur(8px)}to{opacity:1;filter:none}}
 .bottom{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;padding-top:18px;border-top:1px solid var(--bone)}
 .bottom p{margin:0;max-width:44ch;color:var(--bone)}
 #req{display:flex;align-items:center;border-bottom:1px solid var(--bone);min-width:min(100%,360px)}
@@ -60,20 +60,21 @@ button:hover{color:var(--dot)}
 .panel-head button{min-height:28px;padding:0 2px;font-size:16px;line-height:1}
 .panel form{display:flex;flex-direction:column;gap:14px;padding:16px 12px 14px;background:linear-gradient(var(--ink),rgba(14,14,13,.85))}
 .panel .f{display:flex;flex-direction:column;gap:2px;border-bottom:1px solid var(--mute)}
-.panel .f:focus-within{border-color:var(--bone)}
+.panel .f:focus-within{border-color:var(--dot)}
+.panel input:focus-visible{outline:none}
 .panel label{color:var(--mute)}
-.panel input{min-height:36px}
+.panel input{flex:none;height:34px;min-height:0;font-size:14px}
 .panel .go{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:4px}
 .panel .go button{padding:0 0 0 12px;font-size:18px}
 .panel .msg{color:var(--dot);min-height:1.2em}
-.panel .foot{padding:9px 12px;border-top:1px solid #3a3936;color:var(--mute);background:var(--ink)}
 :focus-visible{outline:1px solid var(--bone);outline-offset:4px}
 .note{min-height:1.2em;margin-top:8px;text-align:right;color:var(--mute)}
 br.m{display:none}
 @media (max-width:700px){
   /* phone: wordmark on two lines, each as wide as the screen allows */
   br.m{display:inline}
-  h1{line-height:.84;text-align:right}
+  h1{line-height:.84}
+  .panel input{font-size:16px;height:38px}
   .mono{font-size:13px}
   .bottom{flex-direction:column;align-items:stretch;gap:22px;padding-top:20px}
   .bottom p{font-size:13px}
@@ -111,7 +112,6 @@ h1{text-shadow:-.012em 0 rgba(255,40,80,.28),.012em 0 rgba(40,170,255,.28)}
         <div class="f"><label for="lPass">Password</label><input id="lPass" type="password" autocomplete="current-password"></div>
         <div class="go"><span class="msg" id="lMsg" role="status"></span><button type="submit" aria-label="Log in">&rarr;</button></div>
       </form>
-      <div class="foot">No account? By invitation only.</div>
     </div>
   </div>
   <div></div>
