@@ -12,7 +12,7 @@ import Notice from '@/components/Notice';
 type Profile = {
   id: number; username: string; created_at: string; last_seen_at: string | null; is_admin: boolean;
   via_kind: string | null; via_batch: string | null; inviter: string | null;
-  threads: number; replies: number; invited: number;
+  threads: number; replies: number; invited: number; props: number;
 };
 type Activity = { kind: 'thread' | 'reply'; thread_id: number; title: string; board: string; post_id: number | null; at: string };
 
@@ -30,7 +30,9 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
             i.kind AS via_kind, i.batch AS via_batch, inv.username AS inviter,
             (SELECT count(*)::int FROM threads WHERE user_id = u.id AND NOT deleted) AS threads,
             (SELECT count(*)::int FROM posts WHERE user_id = u.id AND NOT deleted) AS replies,
-            (SELECT count(*)::int FROM invites WHERE created_by = u.id AND kind = 'member' AND used_by IS NOT NULL) AS invited
+            (SELECT count(*)::int FROM invites WHERE created_by = u.id AND kind = 'member' AND used_by IS NOT NULL) AS invited,
+            (SELECT count(*)::int FROM props pr WHERE (pr.target = 'thread' AND pr.target_id IN (SELECT id FROM threads WHERE user_id = u.id AND NOT deleted))
+                                              OR (pr.target = 'post' AND pr.target_id IN (SELECT id FROM posts WHERE user_id = u.id AND NOT deleted))) AS props
        FROM members u
        LEFT JOIN invites i ON i.id = u.invited_via
        LEFT JOIN members inv ON inv.id = i.created_by AND i.kind = 'member'
@@ -70,11 +72,15 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
             Joined {date(p.created_at)}{via ? <> / {via}</> : null}{p.last_seen_at ? <> / Seen {ago(p.last_seen_at)}</> : null}
           </p>
         </div>
-        {p.is_admin && <span className="pill on">Admin</span>}
+        <div className="actions">
+          {p.is_admin && <span className="pill on">Admin</span>}
+          {!own && <Link className="btn solid" href={`/messages/${encodeURIComponent(p.username)}`}>Message</Link>}
+        </div>
       </div>
       <div className="stats mono mute">
         <span><b>{p.threads}</b>Threads</span>
-        <span><b>{p.replies}</b>Replies</span>
+        <span><b>{p.replies}</b>Comments</span>
+        <span><b>{p.props}</b>Props</span>
         <span><b>{p.invited}</b>Brought in</span>
       </div>
 
@@ -87,7 +93,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
                 <li key={`${a.kind}${a.post_id ?? a.thread_id}`}>
                   <Link className="row" href={`/forum/t/${a.thread_id}${a.post_id ? `#p${a.post_id}` : ''}`}>
                     <span className="t">{a.title}</span>
-                    <span className="n mono">{a.kind === 'thread' ? 'Started' : 'Replied'}</span>
+                    <span className="n mono">{a.kind === 'thread' ? 'Started' : 'Commented'}</span>
                     <span className="m mono">{boardBySlug(a.board)?.name ?? a.board} / {ago(a.at)}</span>
                   </Link>
                 </li>

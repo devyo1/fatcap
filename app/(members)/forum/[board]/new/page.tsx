@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { CITY, LIMITS, boardBySlug } from '@/lib/config';
+import { BOARDS, CITY, LIMITS, boardBySlug } from '@/lib/config';
 import { createThread } from '@/app/actions';
 import Notice from '@/components/Notice';
 
@@ -19,7 +19,12 @@ export default async function NewThread({ params, searchParams }: { params: Prom
       <div className="head"><h1 className="wide h1">New thread</h1></div>
       <Notice error={error} />
       <form action={createThread} className="stack" style={{ marginTop: 24 }}>
-        <input type="hidden" name="board" value={board.slug} />
+        <div className="field">
+          <label className="mono" htmlFor="board">Board</label>
+          <select className="input select" id="board" name="board" defaultValue={board.slug}>
+            {BOARDS.map((b) => <option key={b.slug} value={b.slug}>{b.name}</option>)}
+          </select>
+        </div>
         <div className="field">
           <label className="mono" htmlFor="title">Title</label>
           <input className="input" id="title" name="title" maxLength={LIMITS.title} required autoComplete="off" />
@@ -27,9 +32,10 @@ export default async function NewThread({ params, searchParams }: { params: Prom
         <div className="field">
           <label className="mono" htmlFor="body">Post</label>
           <textarea className="textarea" id="body" name="body" maxLength={LIMITS.body} required rows={9} />
+          <span className="hint mono">@name to mention someone. Start a line with &gt; to quote. **bold**. Links work.</span>
         </div>
         <div className="actions">
-          <button className="btn solid" type="submit">Post in {board.name}</button>
+          <button className="btn solid" type="submit">Post thread</button>
           <Link className="mono mute" href={`/forum/${board.slug}`}>Cancel</Link>
         </div>
       </form>

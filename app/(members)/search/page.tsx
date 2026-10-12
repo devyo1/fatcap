@@ -1,0 +1,70 @@
+import Link from 'next/link';
+import { q } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
+import { CITY, boardBySlug } from '@/lib/config';
+import { ago } from '@/lib/format';
+
+export const metadata = { title: 'Search' };
+
+type Hit = { thread_id: number; post_id: number | null; title: string; board: string; author: string | null; snippet: string; at: string };
+
+export default async function Search({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  await requireUser();
+  const term = ((await searchParams).q ?? '').trim().slice(0, 80);
+  const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  const [hits, people] = term.length >= 2
+    ? await Promise.all([
+        q<Hit>(
+          `(SELECT t.id AS thread_id, NULL::int AS post_id, t.title, t.board, u.username AS author, left(t.body, 200) AS snippet, t.created_at AS at
+              FROM threads t LEFT JOIN members u ON u.id = t.user_id
+             WHERE t.city = $2 AND NOT t.deleted AND (t.title ILIKE $1 OR t.body ILIKE $1))
+           UNION ALL
+           (SELECT t.id, p.id, t.title, t.board, u.username, left(p.body, 200), p.created_at
+              FROM posts p JOIN threads t ON t.id = p.thread_id LEFT JOIN members u ON u.id = p.user_id
+             WHERE t.city = $2 AND NOT t.deleted AND NOT p.deleted AND p.body ILIKE $1)
+           ORDER BY at DESC LIMIT 40`,
+          [like, CITY],
+        ),
+        q<{ username: string }>('SELECT username FROM members WHERE username_key LIKE $1 AND NOT banned ORDER BY username LIMIT 12', [like.toLowerCase()]),
+      ])
+    : [[], []];
+
+  return (
+    <>
+      <div className="head"><h1 className="wide h1">Search</h1></div>
+      <form className="searchbar" action="/search" role="search">
+        <label className="sr" htmlFor="q">Search threads, comments and members</label>
+        <input className="input" id="q" name="q" defaultValue={term} placeholder="Threads, comments, members" autoComplete="off" />
+        <button className="btn" type="submit">Search</button>
+      </form>
+
+      {term.length >= 2 && (
+        <>
+          {people.length > 0 && (
+            <section className="section mono">
+              <span className="mute br">Members</span>
+              <p className="peoplelist">{people.map((p) => <Link key={p.username} href={`/u/${encodeURIComponent(p.username)}`}>{p.username}</Link>)}</p>
+            </section>
+          )}
+          <section className="section">
+            <span className="mono mute br">{hits.length} {hits.length === 1 ? 'result' : 'results'}</span>
+            {hits.length ? (
+              <ul className="rows">
+                {hits.map((h) => (
+                  <li key={`${h.thread_id}-${h.post_id ?? 't'}`}>
+                    <Link className="row" href={`/forum/t/${h.thread_id}${h.post_id ? `#p${h.post_id}` : ''}`}>
+                      <span className="t">{h.title}</span>
+                      <span className="n mono">{h.post_id ? 'Comment' : 'Thread'}</span>
+                      <span className="m snippet">{h.snippet}</span>
+                      <span className="m mono"><span>{boardBySlug(h.board)?.name}</span><span>{h.author ?? 'gone'}</span><span>{ago(h.at)}</span></span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="empty mono">Nothing matches.</p>}
+          </section>
+        </>
+      )}
+    </>
+  );
+}

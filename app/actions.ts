@@ -11,6 +11,11 @@ import {
 import { CITY, LIMITS, boardBySlug } from '@/lib/config';
 import { createStickerBatch, memberInvite } from '@/lib/invites';
 import { str } from '@/lib/format';
+import { notify, idsForNames } from '@/lib/notify';
+import { mentionsIn } from '@/components/RichText';
+
+/** Only allow redirects back to our own pages. */
+const safeBack = (p: string) => (p.startsWith('/') && !p.startsWith('//') ? p : '/forum');
 
 const back = (path: string, err: string): never => redirect(`${path}${path.includes('?') ? '&' : '?'}error=${encodeURIComponent(err)}`);
 
@@ -104,22 +109,77 @@ export async function createThread(form: FormData) {
     'INSERT INTO threads (city, board, user_id, title, body) VALUES ($1, $2, $3, $4, $5) RETURNING id',
     [CITY, board!.slug, me.id, title, body],
   );
+  await notify([{ kind: 'mention', ids: await idsForNames(mentionsIn(body)) }], me.id, t!.id, null);
   redirect(`/forum/t/${t!.id}`);
 }
 
+/** Reply to a thread, or to a comment inside it (parent). */
 export async function reply(form: FormData) {
   const me = await requireUser();
   const threadId = Number(form.get('thread'));
+  const parentId = Number(form.get('parent')) || null;
   const body = str(form.get('body')).trim();
   const path = `/forum/t/${threadId}`;
-  const thread = await one('SELECT id FROM threads WHERE id = $1 AND NOT deleted', [threadId]);
+  const thread = await one<{ id: number; user_id: number | null; locked: boolean }>('SELECT id, user_id, locked FROM threads WHERE id = $1 AND NOT deleted', [threadId]);
   if (!thread) redirect('/forum');
+  if (thread!.locked && !me.is_admin) back(path, 'This thread is locked.');
   if (!body) back(path, 'Write something.');
   if (body.length > LIMITS.body) back(path, `Reply is too long (max ${LIMITS.body}).`);
 
-  const p = await one<{ id: number }>('INSERT INTO posts (thread_id, user_id, body) VALUES ($1, $2, $3) RETURNING id', [threadId, me.id, body]);
+  let parentAuthor: number | null = null;
+  if (parentId) {
+    const parent = await one<{ user_id: number | null }>('SELECT user_id FROM posts WHERE id = $1 AND thread_id = $2', [parentId, threadId]);
+    if (!parent) back(path, 'That comment is gone.');
+    parentAuthor = parent!.user_id;
+  }
+
+  const p = await one<{ id: number }>(
+    'INSERT INTO posts (thread_id, user_id, body, parent_id) VALUES ($1, $2, $3, $4) RETURNING id',
+    [threadId, me.id, body, parentId],
+  );
   await q('UPDATE threads SET reply_count = reply_count + 1, last_post_at = now() WHERE id = $1', [threadId]);
+  await q(
+    `INSERT INTO thread_reads (member_id, thread_id, read_at) VALUES ($1, $2, now())
+     ON CONFLICT (member_id, thread_id) DO UPDATE SET read_at = now()`,
+    [me.id, threadId],
+  );
+  // Whoever wrote the comment being answered hears about it first, then the thread starter, then anyone @mentioned.
+  await notify(
+    [
+      { kind: 'comment_reply', ids: [parentAuthor] },
+      { kind: 'reply', ids: [thread!.user_id] },
+      { kind: 'mention', ids: await idsForNames(mentionsIn(body)) },
+    ],
+    me.id, threadId, p!.id,
+  );
   redirect(`${path}#p${p!.id}`);
+}
+
+export async function editThread(form: FormData) {
+  const me = await requireUser();
+  const id = Number(form.get('id'));
+  const title = str(form.get('title')).trim();
+  const body = str(form.get('body')).trim();
+  const path = `/forum/t/${id}`;
+  const t = await one<{ user_id: number }>('SELECT user_id FROM threads WHERE id = $1 AND NOT deleted', [id]);
+  if (!t || (t.user_id !== me.id && !me.is_admin)) redirect('/forum');
+  if (!title || !body) back(path, "Title and post can't be empty.");
+  if (title.length > LIMITS.title || body.length > LIMITS.body) back(path, 'Too long.');
+  await q('UPDATE threads SET title = $1, body = $2, edited_at = now() WHERE id = $3', [title, body, id]);
+  redirect(path);
+}
+
+export async function editPost(form: FormData) {
+  const me = await requireUser();
+  const id = Number(form.get('id'));
+  const body = str(form.get('body')).trim();
+  const p = await one<{ user_id: number; thread_id: number }>('SELECT user_id, thread_id FROM posts WHERE id = $1 AND NOT deleted', [id]);
+  if (!p || (p.user_id !== me.id && !me.is_admin)) redirect('/forum');
+  const path = `/forum/t/${p!.thread_id}`;
+  if (!body) back(path, "A comment can't be empty. Delete it instead.");
+  if (body.length > LIMITS.body) back(path, 'Too long.');
+  await q('UPDATE posts SET body = $1, edited_at = now() WHERE id = $2', [body, id]);
+  redirect(`${path}#p${id}`);
 }
 
 export async function deleteThread(form: FormData) {
@@ -138,7 +198,63 @@ export async function deletePost(form: FormData) {
   if (!p || (p.user_id !== me.id && !me.is_admin)) redirect('/forum');
   await q('UPDATE posts SET deleted = true WHERE id = $1', [id]);
   await q('UPDATE threads SET reply_count = GREATEST(reply_count - 1, 0) WHERE id = $1', [p!.thread_id]);
-  redirect(`/forum/t/${p!.thread_id}`);
+  redirect(`/forum/t/${p!.thread_id}#p${id}`);
+}
+
+/** Give or take back props on a thread or comment. */
+export async function toggleProps(form: FormData) {
+  const me = await requireUser();
+  const target = str(form.get('target')) === 'thread' ? 'thread' : 'post';
+  const id = Number(form.get('id'));
+  const removed = await q('DELETE FROM props WHERE member_id = $1 AND target = $2 AND target_id = $3 RETURNING 1', [me.id, target, id]);
+  if (!removed.length) await q('INSERT INTO props (member_id, target, target_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [me.id, target, id]);
+  redirect(safeBack(str(form.get('back'))));
+}
+
+export async function setThreadFlag(form: FormData) {
+  await requireAdmin();
+  const id = Number(form.get('id'));
+  const flag = str(form.get('flag'));
+  if (flag === 'pinned') await q('UPDATE threads SET pinned = NOT pinned WHERE id = $1', [id]);
+  if (flag === 'locked') await q('UPDATE threads SET locked = NOT locked WHERE id = $1', [id]);
+  redirect(`/forum/t/${id}`);
+}
+
+/* ---------- alerts ---------- */
+
+export async function markAlertsRead() {
+  const me = await requireUser();
+  await q('UPDATE notifications SET read_at = now() WHERE member_id = $1 AND read_at IS NULL', [me.id]);
+  redirect('/alerts');
+}
+
+/* ---------- private messages ---------- */
+
+export async function sendMessage(form: FormData) {
+  const me = await requireUser();
+  const toName = str(form.get('to'));
+  const body = str(form.get('body')).trim();
+  const path = `/messages/${encodeURIComponent(toName)}`;
+  const to = await one<{ id: number }>('SELECT id FROM members WHERE username_key = $1 AND NOT banned', [usernameKey(toName)]);
+  if (!to || to.id === me.id) redirect('/messages');
+  if (!body) back(path, 'Write something.');
+  if (body.length > LIMITS.message) back(path, `Too long (max ${LIMITS.message}).`);
+
+  const [a, b] = me.id < to!.id ? [me.id, to!.id] : [to!.id, me.id];
+  const conv = await one<{ id: number }>(
+    `INSERT INTO conversations (member_a, member_b) VALUES ($1, $2)
+     ON CONFLICT (member_a, member_b) DO UPDATE SET member_a = EXCLUDED.member_a RETURNING id`,
+    [a, b],
+  );
+  await q('INSERT INTO messages (conversation_id, sender_id, body) VALUES ($1, $2, $3)', [conv!.id, me.id, body]);
+  await q(
+    `UPDATE conversations SET last_message_at = now(), last_sender_id = $2,
+            a_read_at = CASE WHEN member_a = $2 THEN now() ELSE a_read_at END,
+            b_read_at = CASE WHEN member_b = $2 THEN now() ELSE b_read_at END
+      WHERE id = $1`,
+    [conv!.id, me.id],
+  );
+  redirect(`${path}#end`);
 }
 
 /* ---------- account ---------- */

@@ -73,6 +73,58 @@ const statements = [
   )`,
   `CREATE INDEX IF NOT EXISTS posts_thread_idx ON posts (thread_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS posts_user_idx ON posts (user_id)`,
+
+  // v2: threaded comments, pin/lock, edits, props, unread tracking, DMs, alerts
+  `ALTER TABLE threads ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE threads ADD COLUMN IF NOT EXISTS locked boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE threads ADD COLUMN IF NOT EXISTS edited_at timestamptz`,
+  `ALTER TABLE posts ADD COLUMN IF NOT EXISTS parent_id integer REFERENCES posts(id) ON DELETE SET NULL`,
+  `ALTER TABLE posts ADD COLUMN IF NOT EXISTS edited_at timestamptz`,
+  `CREATE TABLE IF NOT EXISTS props (
+    member_id  integer NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    target     text NOT NULL CHECK (target IN ('thread', 'post')),
+    target_id  integer NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (member_id, target, target_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS props_target_idx ON props (target, target_id)`,
+  `CREATE TABLE IF NOT EXISTS thread_reads (
+    member_id integer NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    thread_id integer NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    read_at   timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (member_id, thread_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS conversations (
+    id              serial PRIMARY KEY,
+    member_a        integer NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    member_b        integer NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    last_message_at timestamptz NOT NULL DEFAULT now(),
+    last_sender_id  integer,
+    a_read_at       timestamptz,
+    b_read_at       timestamptz,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (member_a, member_b),
+    CHECK (member_a < member_b)
+  )`,
+  `CREATE TABLE IF NOT EXISTS messages (
+    id              serial PRIMARY KEY,
+    conversation_id integer NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    sender_id       integer REFERENCES members(id) ON DELETE SET NULL,
+    body            text NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS messages_conv_idx ON messages (conversation_id, created_at)`,
+  `CREATE TABLE IF NOT EXISTS notifications (
+    id         serial PRIMARY KEY,
+    member_id  integer NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    kind       text NOT NULL,
+    actor_id   integer REFERENCES members(id) ON DELETE SET NULL,
+    thread_id  integer REFERENCES threads(id) ON DELETE CASCADE,
+    post_id    integer REFERENCES posts(id) ON DELETE CASCADE,
+    read_at    timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS notifications_member_idx ON notifications (member_id, created_at DESC)`,
 ];
 
 for (const s of statements) await exec(s);

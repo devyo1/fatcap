@@ -13,4 +13,6 @@ export function boardBySlug(slug: string) {
   return BOARDS.find((b) => b.slug === slug) ?? null;
 }
 
-export const LIMITS = { title: 120, body: 5000, username: [3, 20] as const, password: 8 };
+export const LIMITS = { title: 120, body: 5000, message: 2000, username: [3, 20] as const, password: 8 };
+
+export const PAGE_SIZE = 30;
