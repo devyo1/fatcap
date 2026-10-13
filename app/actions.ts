@@ -162,7 +162,7 @@ export async function editThread(form: FormData) {
   const body = str(form.get('body')).trim();
   const path = `/forum/t/${id}`;
   const t = await one<{ user_id: number }>('SELECT user_id FROM threads WHERE id = $1 AND NOT deleted', [id]);
-  if (!t || (t.user_id !== me.id && !me.is_admin)) redirect('/forum');
+  if (!t || t.user_id !== me.id) redirect('/forum');
   if (!title || !body) back(path, "Title and post can't be empty.");
   if (title.length > LIMITS.title || body.length > LIMITS.body) back(path, 'Too long.');
   await q('UPDATE threads SET title = $1, body = $2, edited_at = now() WHERE id = $3', [title, body, id]);
@@ -174,7 +174,7 @@ export async function editPost(form: FormData) {
   const id = Number(form.get('id'));
   const body = str(form.get('body')).trim();
   const p = await one<{ user_id: number; thread_id: number }>('SELECT user_id, thread_id FROM posts WHERE id = $1 AND NOT deleted', [id]);
-  if (!p || (p.user_id !== me.id && !me.is_admin)) redirect('/forum');
+  if (!p || p.user_id !== me.id) redirect('/forum');
   const path = `/forum/t/${p!.thread_id}`;
   if (!body) back(path, "A comment can't be empty. Delete it instead.");
   if (body.length > LIMITS.body) back(path, 'Too long.');
@@ -201,7 +201,7 @@ export async function deletePost(form: FormData) {
   redirect(`/forum/t/${p!.thread_id}#p${id}`);
 }
 
-/** Give or take back props on a thread or comment. */
+/** Like or unlike a thread or comment. */
 export async function toggleProps(form: FormData) {
   const me = await requireUser();
   const target = str(form.get('target')) === 'thread' ? 'thread' : 'post';

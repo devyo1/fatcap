@@ -43,7 +43,7 @@ export default function ThreadRows({ rows, showBoard = false, empty, numbered = 
             </span>
             <span className="stats-col mono">
               <span><b>{t.reply_count}</b> {t.reply_count === 1 ? 'comment' : 'comments'}</span>
-              {t.props ? <span className="mute"><b>{t.props}</b> props</span> : null}
+              {t.props ? <span className="mute"><b>{t.props}</b> {t.props === 1 ? 'like' : 'likes'}</span> : null}
             </span>
           </Link>
         </li>

@@ -84,7 +84,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
       <div className="stats mono mute">
         <span><b>{p.threads}</b>Threads</span>
         <span><b>{p.replies}</b>Comments</span>
-        <span><b>{p.props}</b>Props</span>
+        <span><b>{p.props}</b>Likes</span>
         <span><b>{p.invited}</b>Brought in</span>
       </div>
 

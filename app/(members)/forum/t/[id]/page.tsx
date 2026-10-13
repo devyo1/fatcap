@@ -31,14 +31,14 @@ function Author({ name }: { name: string | null }) {
   return name ? <Link className="who" href={`/u/${encodeURIComponent(name)}`}>{name}</Link> : <span className="who">gone</span>;
 }
 
-function PropsButton({ target, id, count, mine, back }: { target: 'thread' | 'post'; id: number; count: number; mine: boolean; back: string }) {
+function LikeButton({ target, id, count, mine, back }: { target: 'thread' | 'post'; id: number; count: number; mine: boolean; back: string }) {
   return (
     <form action={toggleProps}>
       <input type="hidden" name="target" value={target} />
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="back" value={back} />
-      <button className={`chip${mine ? ' on' : ''}`} type="submit" aria-pressed={mine} title={mine ? 'Take back props' : 'Give props'}>
-        Props{count ? <span className="n">{count}</span> : null}
+      <button className={`chip${mine ? ' on' : ''}`} type="submit" aria-pressed={mine} title={mine ? 'Unlike' : 'Like'}>
+        {mine ? 'Liked' : 'Like'}{count ? <span className="n">{count}</span> : null}
       </button>
     </form>
   );
@@ -46,7 +46,8 @@ function PropsButton({ target, id, count, mine, back }: { target: 'thread' | 'po
 
 function Comment({ post, kids, depth, me, threadId, locked }: { post: Post; kids: Map<number, Post[]>; depth: number; me: User; threadId: number; locked: boolean }) {
   const children = kids.get(post.id) ?? [];
-  const canEdit = !post.deleted && (post.user_id === me.id || me.is_admin);
+  const canEdit = !post.deleted && post.user_id === me.id;
+  const canDelete = !post.deleted && (post.user_id === me.id || me.is_admin);
   const anchor = `/forum/t/${threadId}#p${post.id}`;
   const nested = (
     children.length > 0 && (
@@ -75,7 +76,7 @@ function Comment({ post, kids, depth, me, threadId, locked }: { post: Post; kids
       </header>
       <RichText text={post.body} />
       <div className="acts">
-        <PropsButton target="post" id={post.id} count={post.props} mine={post.mine} back={anchor} />
+        <LikeButton target="post" id={post.id} count={post.props} mine={post.mine} back={anchor} />
         {!locked && (
           <details className="pop">
             <summary className="chip">Reply</summary>
@@ -99,7 +100,7 @@ function Comment({ post, kids, depth, me, threadId, locked }: { post: Post; kids
             </form>
           </details>
         )}
-        {canEdit && (
+        {canDelete && (
           <form action={deletePost}>
             <input type="hidden" name="id" value={post.id} />
             <button className="chip danger" type="submit">Delete</button>
@@ -153,7 +154,8 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
   const roots = top.filter(hasLive);
 
   const board = boardBySlug(thread.board);
-  const canEdit = thread.user_id === me.id || me.is_admin;
+  const canEdit = thread.user_id === me.id;
+  const canDelete = thread.user_id === me.id || me.is_admin;
   const locked = thread.locked && !me.is_admin;
 
   return (
@@ -186,7 +188,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
         </header>
         <RichText text={thread.body} />
         <div className="acts">
-          <PropsButton target="thread" id={thread.id} count={thread.props} mine={thread.mine} back={`/forum/t/${thread.id}`} />
+          <LikeButton target="thread" id={thread.id} count={thread.props} mine={thread.mine} back={`/forum/t/${thread.id}`} />
           {canEdit && (
             <details className="pop">
               <summary className="chip">Edit</summary>
@@ -198,7 +200,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
               </form>
             </details>
           )}
-          {canEdit && (
+          {canDelete && (
             <form action={deleteThread}>
               <input type="hidden" name="id" value={thread.id} />
               <button className="chip danger" type="submit">Delete thread</button>
