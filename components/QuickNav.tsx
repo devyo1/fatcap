@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { logout } from '@/app/actions';
+import { setAdminView } from '@/app/admin-actions';
 import Avatar from './Avatar';
 import { NavSearch } from './Icons';
 import { haptic } from '@/lib/haptics';
@@ -29,8 +30,11 @@ const CapIcon = () => (
  * Messages, alerts and the profile menu. The server sends first counts; after each
  * navigation (and every 15s) they're re-read, so opening a message clears its badge.
  */
-export default function QuickNav({ username, isAdmin, initial }: { username: string; isAdmin: boolean; initial: { messages: number; alerts: number; market: number } }) {
+export default function QuickNav({ username, isAdmin, canAdmin = false, initial }: {
+  username: string; isAdmin: boolean; canAdmin?: boolean; initial: { messages: number; alerts: number; market: number };
+}) {
   const path = usePathname();
+  const [switching, startSwitch] = useTransition();
   const [counts, setCounts] = useState(initial);
   const last = useRef(initial);
   const [bump, setBump] = useState(0);
@@ -90,6 +94,15 @@ export default function QuickNav({ username, isAdmin, initial }: { username: str
             <Link role="menuitem" href="/messages">Messages</Link>
             <Link role="menuitem" href="/alerts">Alerts</Link>
             {isAdmin && <Link role="menuitem" href="/admin">Admin</Link>}
+            {canAdmin && (
+              <button
+                type="button" role="menuitemcheckbox" aria-checked={isAdmin} className="dd-toggle" disabled={switching}
+                onClick={() => startSwitch(async () => { await setAdminView(!isAdmin); setOpen(false); })}
+                title={isAdmin ? 'Hide admin tools and browse like any member' : 'Show admin tools again'}
+              >
+                <span>Admin view</span><span className={`switch${isAdmin ? ' on' : ''}`} aria-hidden="true" />
+              </button>
+            )}
             <form action={logout} data-logout><button role="menuitem" type="submit">Log out</button></form>
           </div>
         )}

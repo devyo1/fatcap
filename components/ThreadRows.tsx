@@ -26,6 +26,16 @@ export type ThreadRow = {
   mode?: string | null;
   auction_ends?: string | null;
   excerpt?: string | null;
+  ships?: boolean | null;
+  meetup?: boolean | null;
+  meetup_area?: string | null;
+  // card view only
+  text?: string | null;
+  pics?: { id: string; w: number; h: number; a: boolean }[] | null;
+  pic_count?: number;
+  mine?: boolean;
+  saved?: boolean;
+  last_comment?: { author: string | null; body: string } | null;
 };
 
 /** First words of a post for a list: markdown marks and links trimmed. */

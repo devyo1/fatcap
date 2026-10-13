@@ -15,12 +15,31 @@ export const UNBLOCKED = `NOT EXISTS (SELECT 1 FROM blocks bl WHERE bl.blocker_i
 const COLUMNS = `
   t.id, t.title, t.board, t.topic, u.username AS author, t.reply_count, t.last_post_at, t.created_at, t.pinned, t.locked,
   t.expires_at, t.price, t.status, lst.mode, CASE WHEN lst.mode = 'auction' AND NOT lst.settled THEN lst.ends_at END AS auction_ends,
+  lst.ships, lst.meetup, lst.meetup_area,
   substring(t.body from '\\[img:([A-Za-z0-9_-]{16})\\]') AS cover,
   left(regexp_replace(regexp_replace(t.body, '\\[img:[A-Za-z0-9_-]{16}\\][^\\n]*', '', 'g'), '\\s+', ' ', 'g'), 260) AS excerpt,
   COALESCE(r.read_at < t.last_post_at, t.last_post_at > $2) AS unread,
   (SELECT count(*)::int FROM props WHERE target = 'thread' AND target_id = t.id) AS props,
   (SELECT m.username FROM posts p JOIN members m ON m.id = p.user_id
     WHERE p.thread_id = t.id AND NOT p.deleted ORDER BY p.created_at DESC LIMIT 1) AS last_author`;
+
+// The card view also wants: the post's text (pictures taken out), its first four pictures with
+// their sizes (and how many there are), whether the viewer liked / saved it, and the latest comment
+// (not from someone they blocked).
+const CARD_COLUMNS = `,
+  left(regexp_replace(t.body, '\\[img:[A-Za-z0-9_-]{16}\\][^\\n]*\\n?', '', 'g'), 900) AS text,
+  (SELECT json_agg(json_build_object('id', md.id, 'w', md.width, 'h', md.height, 'a', md.animated) ORDER BY x.ord)
+     FROM regexp_matches(t.body, '\\[img:([A-Za-z0-9_-]{16})\\]', 'g') WITH ORDINALITY AS x(m, ord)
+     JOIN media md ON md.id = x.m[1]
+    WHERE x.ord <= 4) AS pics,
+  (SELECT count(*)::int FROM regexp_matches(t.body, '\\[img:[A-Za-z0-9_-]{16}\\]', 'g') AS y) AS pic_count,
+  EXISTS (SELECT 1 FROM props WHERE target = 'thread' AND target_id = t.id AND member_id = $1) AS mine,
+  EXISTS (SELECT 1 FROM thread_saves sv WHERE sv.thread_id = t.id AND sv.member_id = $1) AS saved,
+  (SELECT json_build_object('author', cu.username, 'body', left(regexp_replace(cp.body, '\\[img:[A-Za-z0-9_-]{16}\\][^\\n]*', '', 'g'), 200))
+     FROM posts cp LEFT JOIN members cu ON cu.id = cp.user_id
+    WHERE cp.thread_id = t.id AND NOT cp.deleted
+      AND NOT EXISTS (SELECT 1 FROM blocks cb WHERE cb.blocker_id = $1 AND cb.blocked_id = cp.user_id)
+    ORDER BY cp.created_at DESC LIMIT 1) AS last_comment`;
 
 const FROM = `
   FROM threads t
@@ -48,13 +67,13 @@ const ORDER: Record<Sort, string> = {
 };
 
 /** Threads for a board / sub-forum (or everything), with an unread flag for `me`. Pinned first on Recent. */
-export async function listThreads(me: User, opts: { board?: string; topic?: string; sort?: Sort; page?: number; limit?: number; offset?: number } = {}) {
+export async function listThreads(me: User, opts: { board?: string; topic?: string; sort?: Sort; page?: number; limit?: number; offset?: number; cards?: boolean } = {}) {
   const limit = opts.limit ?? PAGE_SIZE;
   const page = Math.max(1, opts.page ?? 1);
   const offset = Math.max(0, opts.offset ?? (page - 1) * limit);
   const sort = opts.sort ?? 'recent';
   const rows = await q<ThreadRow>(
-    `SELECT ${COLUMNS} ${FROM}
+    `SELECT ${COLUMNS}${opts.cards ? CARD_COLUMNS : ''} ${FROM}
       WHERE ${LIVE} AND ${UNBLOCKED} AND ($3::text IS NULL OR t.board = $3) AND ($6::text IS NULL OR t.topic = $6)
         ${sort === 'top' ? `AND t.created_at > now() - interval '30 days'` : ''}
       ORDER BY ${opts.board && sort === 'recent' ? 't.pinned DESC,' : ''} ${ORDER[sort]}, t.id DESC
@@ -70,9 +89,9 @@ export async function listThreads(me: User, opts: { board?: string; topic?: stri
  * and busy threads stay up a while. Threads you haven't opened get a lift; ones you've fully
  * read sink a little, so the feed keeps moving.
  */
-export async function feedThreads(me: User, limit = 25, offset = 0) {
+export async function feedThreads(me: User, limit = 25, offset = 0, cards = false) {
   return q<ThreadRow>(
-    `SELECT ${COLUMNS} ${FROM}
+    `SELECT ${COLUMNS}${cards ? CARD_COLUMNS : ''} ${FROM}
       WHERE ${LIVE} AND ${UNBLOCKED} AND t.last_post_at > now() - interval '120 days'
       ORDER BY
         (1 + ${ENGAGEMENT} + CASE WHEN t.body ~ '\\[img:' THEN 2 ELSE 0 END)

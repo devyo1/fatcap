@@ -13,6 +13,18 @@ export function RefreshEvery({ seconds = 10 }: { seconds?: number }) {
   return null;
 }
 
+/** Brings one element into view (centred) if it isn't already, and marks it for a moment. */
+export function Reveal({ id }: { id: string }) {
+  useEffect(() => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.top < 80 || r.bottom > window.innerHeight - 90) el.scrollIntoView({ block: 'center' });
+    el.classList.add('reveal');
+  }, [id]);
+  return null;
+}
+
 /** Keeps a message list scrolled to the newest message when it first renders or grows. */
 export function ScrollToEnd({ count }: { count: number }) {
   const ref = useRef<HTMLDivElement>(null);

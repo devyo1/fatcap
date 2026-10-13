@@ -253,36 +253,6 @@ export async function deletePost(form: FormData) {
   redirect(`/forum/t/${p!.thread_id}#p${id}`);
 }
 
-/** Like or unlike a thread or comment. */
-export async function toggleProps(form: FormData) {
-  const me = await requireUser();
-  const target = str(form.get('target')) === 'thread' ? 'thread' : 'post';
-  const id = Number(form.get('id'));
-  const removed = await q('DELETE FROM props WHERE member_id = $1 AND target = $2 AND target_id = $3 RETURNING 1', [me.id, target, id]);
-  if (!removed.length) await q('INSERT INTO props (member_id, target, target_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [me.id, target, id]);
-  redirect(safeBack(str(form.get('back'))));
-}
-
-/** Follow / unfollow a thread (alerts for new comments). Unfollowing sticks, even if you comment again. */
-export async function toggleFollow(form: FormData) {
-  const me = await requireUser();
-  const id = Number(form.get('id'));
-  await q(
-    `INSERT INTO thread_follows (member_id, thread_id, following) VALUES ($1, $2, true)
-     ON CONFLICT (member_id, thread_id) DO UPDATE SET following = NOT thread_follows.following`,
-    [me.id, id],
-  );
-  redirect(`/forum/t/${id}`);
-}
-
-export async function toggleSave(form: FormData) {
-  const me = await requireUser();
-  const id = Number(form.get('id'));
-  const removed = await q('DELETE FROM thread_saves WHERE member_id = $1 AND thread_id = $2 RETURNING 1', [me.id, id]);
-  if (!removed.length) await q('INSERT INTO thread_saves (member_id, thread_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, id]);
-  redirect(safeBack(str(form.get('back')) || `/forum/t/${id}`));
-}
-
 /** Market: the seller (or an admin) marks a listing sold, or puts it back up. */
 export async function toggleSold(form: FormData) {
   const me = await requireUser();

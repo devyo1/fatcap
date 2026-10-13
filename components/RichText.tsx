@@ -95,7 +95,7 @@ export type MediaInfo = Record<string, { w: number; h: number; anim: boolean }>;
  * jumping while you scroll) and stills come in a size that suits the screen; animations always
  * get the original (the smaller copies are first frames).
  */
-function picAttrs(id: string, info: MediaInfo[string] | undefined, sizes: string) {
+export function picAttrs(id: string, info: MediaInfo[string] | undefined, sizes: string) {
   const url = mediaUrl(id);
   if (!info) return { src: url };
   const dims = { width: info.w, height: info.h };

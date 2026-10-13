@@ -6,9 +6,9 @@ import { LIMITS, REPORT_REASONS, boardBySlug, subBySlug } from '@/lib/config';
 import { LIVE, listThreads } from '@/lib/threads';
 import { ago, left } from '@/lib/format';
 import {
-  reply, deletePost, deleteThread, editPost, editThread, toggleProps, setThreadFlag, moveThread,
-  toggleFollow, toggleSave, toggleSold, report,
+  reply, deletePost, deleteThread, editPost, editThread, setThreadFlag, moveThread, toggleSold, report,
 } from '@/app/actions';
+import { LikeButton, FollowButton, SaveButton } from '@/components/Toggles';
 import RichText, { type MediaInfo } from '@/components/RichText';
 import ThreadRows from '@/components/ThreadRows';
 import ListingGrid from '@/components/ListingGrid';
@@ -19,10 +19,11 @@ import { readingMinutes } from '@/components/RichText';
 import PlacePicker from '@/components/PlacePicker';
 import VanishPicker from '@/components/VanishPicker';
 import QuoteButton from '@/components/QuoteButton';
-import { Heart, Reply, More, Bell, Bookmark, Hourglass, Minus, Plus } from '@/components/Icons';
+import { Reply, More, Hourglass, Minus, Plus } from '@/components/Icons';
 import DealBox, { type PendingOffer } from '@/components/DealBox';
 import ListingForm from '@/components/ListingForm';
 import ZineViewer, { type ZinePage } from '@/components/ZineViewer';
+import ListingGallery, { type GalleryPic } from '@/components/ListingGallery';
 import { RefreshEvery } from '@/components/Live';
 import Pulse from '@/components/Pulse';
 import ReadingBar from '@/components/ReadingBar';
@@ -52,19 +53,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 function Author({ name }: { name: string | null }) {
   return name ? <Link className="who" href={`/u/${encodeURIComponent(name)}`}>{name}</Link> : <span className="who">gone</span>;
-}
-
-function LikeButton({ target, id, count, mine, back }: { target: 'thread' | 'post'; id: number; count: number; mine: boolean; back: string }) {
-  return (
-    <form action={toggleProps}>
-      <input type="hidden" name="target" value={target} />
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="back" value={back} />
-      <button className={`act${mine ? ' on' : ''}`} type="submit" aria-pressed={mine} title={mine ? 'Unlike' : 'Like'}>
-        <Heart on={mine} /><span>{count || 'Like'}</span>
-      </button>
-    </form>
-  );
 }
 
 /** "⋯" menu for the less common actions. */
@@ -151,7 +139,7 @@ function Comment({ post, kids, depth, me, threadId, locked, since, mode, blocked
       ) : <RichText text={post.body} media={media} />}
       {!editing && (
         <div className="acts">
-          <LikeButton target="post" id={post.id} count={post.props} mine={post.mine} back={anchor} />
+          <LikeButton target="post" id={post.id} count={post.props} mine={post.mine} />
           {!locked && (
             <details className="pop">
               <summary className="act"><Reply /><span>Reply</span></summary>
@@ -283,10 +271,39 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
     const by = new Map(dims.map((d) => [d.id, d]));
     zine = pageIds.filter((i) => by.has(i)).map((i) => ({ src: mediaUrl(i), w: by.get(i)!.width, h: by.get(i)!.height }));
   }
-  const text = zine.length >= 2 ? thread.body.split('\n').filter((line) => !MEDIA_LINE.test(line.trim())).join('\n') : thread.body;
+  // Any other listing with photos shows them first, in a gallery, like a shop would.
+  const gallery: GalleryPic[] = l && zine.length < 2 ? mediaIn(thread.body).filter((i) => media[i]).map((i) => ({ id: i, ...media[i] })) : [];
+  const showcase = !editing && (zine.length >= 2 || gallery.length > 0);
+  const text = showcase ? thread.body.split('\n').filter((line) => !MEDIA_LINE.test(line.trim())).join('\n') : thread.body;
   const cents = (c: number | null) => (c == null ? '' : (c / 100).toFixed(c % 100 ? 2 : 0));
   const next = nearby.rows.filter((t) => t.id !== thread.id).slice(0, market ? 4 : 5);
   const placeLabel = sub?.name ?? board?.name ?? 'the forum';
+
+  const head = (
+    <header className="thread-head">
+      {(thread.pinned || thread.locked || thread.expires_at) && (
+        <div className="flags mono">
+          {thread.pinned && <span className="pill on">Pinned</span>}
+          {thread.locked && <span className="pill">Locked</span>}
+          {thread.expires_at && <span className="pill vanish" title={new Date(thread.expires_at).toUTCString()}><Hourglass />Vanishes in {left(thread.expires_at)}</span>}
+        </div>
+      )}
+      <h1 className="title thread-title">{thread.title}</h1>
+      <div className="thread-meta mono">
+        <Avatar name={thread.author} size={26} />
+        <Author name={thread.author} />
+        <span>{ago(thread.created_at)}</span>
+        {thread.edited_at && <span className="mute">edited</span>}
+        {readingMinutes(thread.body) >= 3 && <span className="mute">{readingMinutes(thread.body)} min read</span>}
+      </div>
+    </header>
+  );
+  const deal = l && !editing && (
+    <DealBox
+      thread={{ id: thread.id, title: thread.title, author: thread.author, user_id: thread.user_id }}
+      l={l} status={thread.status} me={me} rep={rep!} myRep={myRep} bids={bids} offers={offers} myOffer={myOffer} myDealId={myDeal?.id ?? null}
+    />
+  );
 
   return (
     <>
@@ -296,34 +313,19 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
         {sub && <><span>/</span><Link href={`/forum/${thread.board}/${sub.slug}`}>{sub.name}</Link></>}
       </nav>
 
-      <header className="thread-head">
-        {(thread.pinned || thread.locked || thread.expires_at) && (
-          <div className="flags mono">
-            {thread.pinned && <span className="pill on">Pinned</span>}
-            {thread.locked && <span className="pill">Locked</span>}
-            {thread.expires_at && <span className="pill vanish" title={new Date(thread.expires_at).toUTCString()}><Hourglass />Vanishes in {left(thread.expires_at)}</span>}
-          </div>
-        )}
-        <h1 className="title thread-title">{thread.title}</h1>
-        <div className="thread-meta mono">
-          <Avatar name={thread.author} size={26} />
-          <Author name={thread.author} />
-          <span>{ago(thread.created_at)}</span>
-          {thread.edited_at && <span className="mute">edited</span>}
-          {readingMinutes(thread.body) >= 3 && <span className="mute">{readingMinutes(thread.body)} min read</span>}
+      {l && !editing ? (
+        // A listing: photos (or the zine) first, then what it is and how to get it; side by side on wide screens.
+        <div className={`listing-top${showcase ? '' : ' bare'}`}>
+          {showcase && <div className="listing-media">{zine.length >= 2 ? <ZineViewer pages={zine} title={thread.title} /> : <ListingGallery pics={gallery} title={thread.title} />}</div>}
+          <div className="listing-side">{head}{deal}</div>
         </div>
-      </header>
+      ) : head}
 
       <Notice error={sp.error} ok={sp.ok} />
 
-      <article className="op" id="op">
+      <article className={`op${l ? ' listing-op' : ''}`} id="op">
         {l && l.mode === 'auction' && auctionOpen(l) && <RefreshEvery seconds={15} />}
-        {l && !editing && (
-          <DealBox
-            thread={{ id: thread.id, title: thread.title, author: thread.author, user_id: thread.user_id }}
-            l={l} status={thread.status} me={me} rep={rep!} myRep={myRep} bids={bids} offers={offers} myOffer={myOffer} myDealId={myDeal?.id ?? null}
-          />
-        )}
+        {l && !editing && text.trim() && <div className="sec-head mono details-head"><span className="br">Details</span></div>}
         {market && !l && (
           <div className={`listing-bar${sold ? ' sold' : ''}`}>
             <span className="l-price">{thread.price || 'No price'}</span>
@@ -336,7 +338,6 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
             </span>
           </div>
         )}
-        {zine.length >= 2 && !editing && <ZineViewer pages={zine} title={thread.title} />}
 
         {editing && l ? (
           <ListingForm
@@ -368,21 +369,10 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
 
         {!editing && (
           <div className="acts">
-            <LikeButton target="thread" id={thread.id} count={thread.props} mine={thread.mine} back={here} />
+            <LikeButton target="thread" id={thread.id} count={thread.props} mine={thread.mine} />
             {!locked && <QuoteButton target="op" author={thread.author} />}
-            <form action={toggleFollow}>
-              <input type="hidden" name="id" value={thread.id} />
-              <button className={`act${thread.following ? ' on' : ''}`} type="submit" aria-pressed={thread.following} title="Alerts for new comments">
-                <Bell on={thread.following} /><span>{thread.following ? 'Following' : 'Follow'}</span>
-              </button>
-            </form>
-            <form action={toggleSave}>
-              <input type="hidden" name="id" value={thread.id} />
-              <input type="hidden" name="back" value={here} />
-              <button className={`act${thread.saved ? ' on' : ''}`} type="submit" aria-pressed={thread.saved}>
-                <Bookmark on={thread.saved} /><span>{thread.saved ? 'Saved' : 'Save'}</span>
-              </button>
-            </form>
+            <FollowButton id={thread.id} following={thread.following} />
+            <SaveButton id={thread.id} saved={thread.saved} />
             <Menu label="More">
               {own && <Link href={`${here}?edit=thread`}>Edit</Link>}
               {!own && <Link href={`${here}?report=thread`}>Report</Link>}

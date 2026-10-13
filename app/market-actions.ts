@@ -179,7 +179,7 @@ export async function setStock(form: FormData) {
   const left = int(form.get('left'), 0, 999, 0);
   await q('UPDATE listings SET quantity = sold_count + $3 WHERE thread_id = $1 AND seller_id = $2 AND mode IN ($4, $5)', [id, me.id, left, 'fixed', 'offers']);
   await syncDisplay(id);
-  redirect(safeBack(str(form.get('back')), '/market?tab=listings'));
+  redirect(safeBack(str(form.get('back')), '/market?tab=selling'));
 }
 
 /* ---------- buying ---------- */
@@ -240,7 +240,7 @@ export async function buy(form: FormData) {
   });
   await notify([{ kind: 'bought', ids: [l.seller_id] }], me.id, { threadId: id, dealId: deal });
   await afterStockChange(id);
-  go('/market', 'ok', 'Deal opened. Arrange payment with the seller, then mark it paid.', `#d${deal}`);
+  go(`/market?deal=${deal}`, 'ok', 'Deal opened. Arrange payment with the seller, then mark it paid.', `#d${deal}`);
 }
 
 /** Make an offer (money, a trade, or both). Replaces your earlier pending offer on the same listing. */
@@ -296,13 +296,13 @@ export async function respondOffer(form: FormData) {
   await q(`UPDATE offers SET status = 'accepted', decided_at = now() WHERE id = $1`, [o!.id]);
   await notify([{ kind: 'offer_accepted', ids: [o!.buyer_id] }], me.id, { threadId: t.id, dealId: deal });
   await afterStockChange(t.id);
-  go('/market', 'ok', 'Accepted. The deal is open.', `#d${deal}`);
+  go(`/market?deal=${deal}`, 'ok', 'Accepted. The deal is open.', `#d${deal}`);
 }
 
 export async function withdrawOffer(form: FormData) {
   const me = await requireUser();
   await q(`UPDATE offers SET status = 'withdrawn', decided_at = now() WHERE id = $1 AND buyer_id = $2 AND kind = 'offer' AND status = 'pending'`, [Number(form.get('offer')), me.id]);
-  redirect(safeBack(str(form.get('back')), '/market?tab=offers'));
+  redirect(safeBack(str(form.get('back')), '/market?tab=buying'));
 }
 
 /** Bid on an auction. Bids are binding; late bids extend the clock. */
@@ -362,7 +362,7 @@ export async function dealStep(form: FormData) {
     [d.id, d.status, step!.next],
   );
   if (moved) await notify([{ kind: `deal_${step!.next}` as NotifyKind, ids: [other] }], me.id, { dealId: d.id });
-  redirect(`/market#d${d.id}`);
+  redirect(`/market?deal=${d.id}#d${d.id}`);
 }
 
 export async function cancelDeal(form: FormData) {
@@ -380,7 +380,7 @@ export async function cancelDeal(form: FormData) {
     await syncDisplay(d.thread_id);
   }
   if (done) await notify([{ kind: 'deal_cancelled', ids: [other] }], me.id, { dealId: d.id });
-  redirect(`/market#d${d.id}`);
+  redirect(`/market?deal=${d.id}#d${d.id}`);
 }
 
 /** Auction winner didn't pay: offer the item to the next highest bidder at their bid. */
@@ -403,7 +403,7 @@ export async function secondChance(form: FormData) {
     amount: next!.amount_cents, shipCents: l!.ship_cents, currency: l!.currency, quantity: 1, method: pickMethod(next!.method ?? '', methods(l!)),
   });
   await notify([{ kind: 'second_chance', ids: [next!.buyer_id] }], me.id, { threadId: d.thread_id, dealId: deal });
-  go('/market', 'ok', 'Offered to the next bidder.', `#d${deal}`);
+  go(`/market?deal=${deal}`, 'ok', 'Offered to the next bidder.', `#d${deal}`);
 }
 
 export async function leaveFeedback(form: FormData) {

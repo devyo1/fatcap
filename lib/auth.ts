@@ -8,8 +8,11 @@ import { LIMITS } from './config';
 
 const COOKIE = 'fc_session';
 const SESSION_DAYS = 30;
+/** An admin can switch their admin tools off on a device and browse like any member. */
+export const ADMIN_VIEW_COOKIE = 'fc_admin_view';
 
-export type User = { id: number; username: string; is_admin: boolean; created_at: string };
+/** `is_admin`: admin tools showing. `can_admin`: actually an admin (tools may be switched off). */
+export type User = { id: number; username: string; is_admin: boolean; created_at: string; can_admin?: boolean };
 
 let dummyHash: string | null = null;
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -70,16 +73,23 @@ export async function currentUser({ touch = true } = {}): Promise<User | null> {
   return user;
 }
 
+/**
+ * The signed-in member, for pages and member actions. An admin with admin view switched off gets
+ * `is_admin: false` here, so pages show (and actions allow) only what any member gets.
+ */
 export async function requireUser(): Promise<User> {
   const user = await currentUser();
   if (!user) redirect('/');
-  return user;
+  if (!user!.is_admin) return user!;
+  const off = (await cookies()).get(ADMIN_VIEW_COOKIE)?.value === 'off';
+  return { ...user!, is_admin: !off, can_admin: true };
 }
 
+/** Admin pages and actions: checks the real flag, whatever the view. */
 export async function requireAdmin(): Promise<User> {
   const user = await currentUser();
   if (!user?.is_admin) notFound();
-  return user;
+  return { ...user!, can_admin: true };
 }
 
 /** Username + password check. Returns the user id, or null. */

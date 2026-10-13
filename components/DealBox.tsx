@@ -82,28 +82,10 @@ export default function DealBox({ thread, l, status, me, rep, myRep, bids, offer
         </span>
       </div>
 
-      <ul className="deal-facts mono">
-        {l.mode === 'auction' && l.ends_at && live && <li><span className="mute">Ends in</span> <Countdown to={l.ends_at} initial={left(l.ends_at)} /></li>}
-        {(l.mode === 'fixed' || l.mode === 'offers') && <li><span className="mute">In stock</span> {left_}{l.quantity > 1 ? ` of ${l.quantity}` : ''}</li>}
-        {l.ships && <li><span className="mute">Ships</span> {l.ship_cents ? `+${money(l.ship_cents, l.currency)}` : 'included'}{l.ship_note ? `, ${l.ship_note}` : ''}</li>}
-        {l.meetup && <li><span className="mute">Meetup</span> {l.meetup_area ?? 'arrange by message'}</li>}
-        {l.trades && <li><span className="mute">Trades</span> open</li>}
-        {l.mode === 'auction' && l.min_deals > 0 && <li><span className="mute">Bidders</span> {l.min_deals}+ completed deals</li>}
-        {l.mode === 'auction' && live && <li><span className="mute">Raise</span> {money(l.increment_cents || 100, l.currency)} min</li>}
-      </ul>
-
-      <div className="deal-seller">
-        <Avatar name={thread.author} size={26} />
-        <span>
-          {thread.author ? <Link className="who" href={`/u/${encodeURIComponent(thread.author)}`}>{thread.author}</Link> : <span className="who">gone</span>}
-          <span className="mono mute">{repLine(rep)}</span>
-        </span>
-      </div>
-
       {/* buyer side */}
       {!own && (
         <div className="deal-actions">
-          {myDealId && <p className="notice mono deal-note">You have a deal on this. <Link href={`/market#d${myDealId}`}>Open it &rarr;</Link></p>}
+          {myDealId && <p className="notice mono deal-note">You have a deal on this. <Link href={`/market?tab=buying#d${myDealId}`}>Open it &rarr;</Link></p>}
           {canBuy && (
             <details className="deal-pop">
               <summary className="btn solid">Buy</summary>
@@ -162,7 +144,7 @@ export default function DealBox({ thread, l, status, me, rep, myRep, bids, offer
       {own && (
         <div className="deal-actions">
           <Link className="btn small" href={`${here}?edit=thread`}>Edit listing</Link>
-          <Link className="btn small" href="/market?tab=listings">Your market</Link>
+          <Link className="btn small" href="/market?tab=selling">Your market</Link>
           {l.mode !== 'auction' && (
             <form action={setListingState}>
               <input type="hidden" name="id" value={thread.id} /><input type="hidden" name="do" value={closed ? 'reopen' : 'close'} /><input type="hidden" name="back" value={here} />
@@ -177,6 +159,24 @@ export default function DealBox({ thread, l, status, me, rep, myRep, bids, offer
           )}
         </div>
       )}
+      <ul className="deal-facts mono">
+        {l.mode === 'auction' && l.ends_at && live && <li><span className="mute">Ends in</span> <Countdown to={l.ends_at} initial={left(l.ends_at)} /></li>}
+        {(l.mode === 'fixed' || l.mode === 'offers') && <li><span className="mute">In stock</span> {left_}{l.quantity > 1 ? ` of ${l.quantity}` : ''}</li>}
+        {l.ships && <li><span className="mute">Ships</span> {l.ship_cents ? `+${money(l.ship_cents, l.currency)}` : 'included'}{l.ship_note ? `, ${l.ship_note}` : ''}</li>}
+        {l.meetup && <li><span className="mute">Meetup</span> {l.meetup_area ?? 'arrange by message'}</li>}
+        {l.trades && <li><span className="mute">Trades</span> open</li>}
+        {l.mode === 'auction' && l.min_deals > 0 && <li><span className="mute">Bidders</span> {l.min_deals}+ completed deals</li>}
+        {l.mode === 'auction' && live && <li><span className="mute">Raise</span> {money(l.increment_cents || 100, l.currency)} min</li>}
+      </ul>
+
+      <div className="deal-seller">
+        <Avatar name={thread.author} size={26} />
+        <span>
+          {thread.author ? <Link className="who" href={`/u/${encodeURIComponent(thread.author)}`}>{thread.author}</Link> : <span className="who">gone</span>}
+          <span className="mono mute">{repLine(rep)}</span>
+        </span>
+      </div>
+
       {own && offers.length > 0 && (
         <div className="deal-list">
           <span className="mono mute br">Offers</span>

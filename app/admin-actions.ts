@@ -1,11 +1,20 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { q, one } from '@/lib/db';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdmin, ADMIN_VIEW_COOKIE } from '@/lib/auth';
 import { str } from '@/lib/format';
 
 const go = (tab: string, extra = '') => redirect(`/admin?tab=${tab}${extra}`);
+
+/** Admin tools on or off on this device (off: browse like any member). The page re-renders in place. */
+export async function setAdminView(on: boolean) {
+  await requireAdmin();
+  const jar = await cookies();
+  if (on) jar.delete(ADMIN_VIEW_COOKIE);
+  else jar.set(ADMIN_VIEW_COOKIE, 'off', { path: '/', maxAge: 60 * 60 * 24 * 365, sameSite: 'lax', httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+}
 
 /** Recount comments for the given threads after posts are hidden, restored or removed. */
 async function recount(threadIds: number[]) {

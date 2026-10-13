@@ -8,6 +8,9 @@ import Notice from '@/components/Notice';
 import { SortTabs, ForumTree, BoardChips } from '@/components/ForumNav';
 import Pulse from '@/components/Pulse';
 import MoreRows from '@/components/MoreRows';
+import ThreadCards from '@/components/ThreadCards';
+import ViewToggle from '@/components/ViewToggle';
+import { layoutOf } from '@/lib/view';
 
 const BATCH = 25;
 
@@ -23,9 +26,11 @@ export default async function Forum({ searchParams }: { searchParams: Promise<{ 
   const me = await requireUser();
   const { welcome, view: rawView } = await searchParams;
   const view = rawView === 'recent' || rawView === 'top' ? rawView : 'feed';
+  const layout = await layoutOf();
+  const cards = layout === 'cards';
 
   const [feed, stats, online, totals, tags] = await Promise.all([
-    view === 'feed' ? feedThreads(me, BATCH + 1) : listThreads(me, { sort: view, limit: BATCH + 1 }).then((r) => r.rows),
+    view === 'feed' ? feedThreads(me, BATCH + 1, 0, cards) : listThreads(me, { sort: view, limit: BATCH + 1, cards }).then((r) => r.rows),
     topicStats(me),
     q<{ username: string }>(`SELECT username FROM members WHERE last_seen_at > now() - interval '15 minutes' AND NOT banned ORDER BY last_seen_at DESC LIMIT 24`),
     one<{ members: number; threads: number; comments: number }>(
@@ -47,7 +52,10 @@ export default async function Forum({ searchParams }: { searchParams: Promise<{ 
             {totals?.members ?? 0} members / {totals?.threads ?? 0} threads<span className="hide-phone"> / {totals?.comments ?? 0} comments</span> / {online.length} online
           </p>
         </div>
-        <Link className="btn solid hide-phone" href="/forum/general/new">New thread</Link>
+        <div className="actions">
+          <ViewToggle layout={layout} />
+          <Link className="btn solid hide-phone" href="/forum/general/new">New thread</Link>
+        </div>
       </div>
       <BoardChips />
       <Pulse since={new Date().toISOString()} />
@@ -55,8 +63,10 @@ export default async function Forum({ searchParams }: { searchParams: Promise<{ 
       <div className="split">
         <section>
           <SortTabs label="Feed" items={VIEWS} current={view} />
-          <ThreadRows rows={rows} showBoard empty={view === 'top' ? 'Nothing this month.' : 'No threads yet.'} />
-          {feed.length > BATCH && <MoreRows key={view} query={{ view }} start={BATCH} have={rows.map((r) => r.id)} size={BATCH} showBoard />}
+          {cards
+            ? <ThreadCards rows={rows} empty={view === 'top' ? 'Nothing this month.' : 'No threads yet.'} />
+            : <ThreadRows rows={rows} showBoard empty={view === 'top' ? 'Nothing this month.' : 'No threads yet.'} />}
+          {feed.length > BATCH && <MoreRows key={`${view}-${layout}`} query={{ view, cards }} start={BATCH} have={rows.map((r) => r.id)} size={BATCH} showBoard />}
         </section>
 
         <aside className="side">

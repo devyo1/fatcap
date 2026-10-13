@@ -20,7 +20,7 @@ export default function Lightbox() {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as HTMLElement).closest?.('a.pic, a.cimg') as HTMLAnchorElement | null;
       if (!a) return;
-      const scope = a.closest('.body, .cmsg-main') ?? a.parentElement ?? document.body;
+      const scope = a.closest('.card-media, .gallery, .body, .cmsg-main') ?? a.parentElement ?? document.body;
       const list = [...scope.querySelectorAll<HTMLAnchorElement>('a.pic, a.cimg')].map((x) => x.href);
       e.preventDefault();
       setView({ list, i: Math.max(0, list.indexOf(a.href)) });

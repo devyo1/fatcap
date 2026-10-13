@@ -20,6 +20,8 @@ They don't pile up: pictures in a thread's opening post last as long as the thre
 - **Tree:** General, Travel, Lifestyle and Market, three sub-forums each, defined in `lib/config.ts` (rename or reorder there, no migration needed). New threads pick a sub-forum. Threads from before sub-forums existed show under their board's "All" until moved (admins: **Move** in the thread's menu; authors: **Edit**).
 - **Feed:** the forum home ranks threads by engagement (comments, likes, how many people joined in, pictures) over time since the last comment, with a lift for threads you haven't opened. **Recent** and **Top** (last 30 days) are one tap away; boards sort by Recent / New / Top. Rows show the opening lines and the first picture. While a page is open, a pill appears when there are new threads (feed) or new comments (thread); tap it to load them.
 - **Tags:** `#anything` in a post becomes a link to every thread using it; the forum home lists the most used ones from the last 60 days.
+- **List or Cards:** the switch at the top of the forum and every board. List is the classic forum; Cards is a social feed (who and when, the title, the start of the post, its photos edge to edge, like / comment / save right there, the latest comment). Remembered per device.
+- **Likes, follows and saves** change on the spot, without reloading the page or moving it.
 - **Browsing:** the feed, boards and Market keep loading as you scroll (past 150 rows it waits for a tap). Going into a thread and coming back keeps your place, with everything that had loaded. A thread ends with more from the same sub-forum.
 - **Pictures in posts** hold their space while they load (nothing jumps while you scroll), and phones get a copy sized for the screen. Animations always get the original; the full picture opens in the viewer.
 - **Vanishing threads:** a thread can delete itself after 24 hours, 7 days or 30 days, taking every comment, like, alert and picture with it.
@@ -37,10 +39,15 @@ Members sell and trade with each other; no money moves through the site. Everyth
 
 - **Listings** sell at a **fixed price** (optionally taking offers too), by **offers**, or by **auction**, with stock for things like a zine run, shipping and/or meetup (an area, never an address), and "open to trades". **Wanted** posts carry a budget instead.
 - **Deals:** buying, an accepted offer, or winning an auction opens a deal. Shipped: buyer marks paid, seller confirms, seller marks shipped, buyer marks received. Meetup: buyer marks paid, seller confirms. Either side can cancel early (the seller with a reason). Both leave feedback at the end.
-- **Market dashboard** (avatar menu -> Market): what's waiting on you, offers to answer, deals in progress, your listings and stock, your offers and bids, history. Each profile shows the member's record (deals, good/bad feedback, unpaid wins), what they're selling, and recent feedback.
-- **Open deals** sit at the top of every Market page while you have any: each one with its next step (or who it's waiting on), offers to answer, and a count on **Your market**.
+- **Browsing the Market:** categories as chips (with counts), listings photo-first with the price up top, **Sell** always at hand. A listing opens on its photos (swipe through, tap to enlarge; zines open in the page-turner), with the buy box (price, Buy / Offer / Bid, Message) right next to them.
+- **Your market** (avatar menu -> Market, or Your market on any Market page): **Buying** (deals on their way to you, your offers and bids), **Selling** (offers to answer, deals to send, your listings and stock) and **History**. Whatever needs you sits at the top of its tab, with a count on the tab. Each profile shows the member's record (deals, good/bad feedback, unpaid wins), what they're selling, and recent feedback.
+- When something needs you (your step in a deal, or an offer to answer), one line at the top of the Market says so and takes you there.
 - **Auctions** can't check anyone's funds, so they run on track record: bids are binding, a bid in the last 2 minutes adds 2 minutes, sellers can require bidders to have 1+, 3+ or 5+ completed deals, a winner who doesn't pay gets an "unpaid" mark, and the seller can offer the item to the next bidder. Bidders stay anonymous to each other; the seller sees names.
 - **Zines** with sample pages (listed in Market / Zines with two or more pictures) open in a page-turning viewer: spreads on wide screens, single pages on phones, swipe, keys, full screen.
+
+## Admins
+
+Admin tools (pin, lock, move, delete anything, the Admin pages) show only for admins. **Admin view** in the avatar menu switches them off on that device, to browse like any member; switch it back on there.
 
 ## Privacy and safety
 
@@ -52,7 +59,7 @@ Members sell and trade with each other; no money moves through the site. Everyth
 
 The site ships a web app manifest, so "Add to Home Screen" on iPhone/Android gives a full-screen app that stays inside the site and opens on the forum. Pull down from the top of any page to refresh. If you added the shortcut before this existed, delete it and add it again.
 
-On phones a tab bar sits at the bottom: Forum, Chat, **+** (new thread or listing where you are, or jumps to the reply box in a thread or chat), Market (dot when something's waiting on you) and your profile. It tucks away while you type, and tapping the tab you're on goes back to the top. The header slides away while you scroll down and comes back when you scroll up; below the top level it has a back arrow. "⋯" menus open as sheets from the bottom, a conversation gets the whole screen with the message box docked at the bottom, and pages show a loading state the moment you tap.
+On phones a tab bar sits at the bottom: Forum, Chat, **+** (new thread or listing where you are, or jumps to the reply box in a thread or chat), Market (dot when something's waiting on you) and your profile. It tucks away while you type, and tapping the tab you're on goes back to the top. The header slides away while you scroll down and comes back when you scroll up; below the top level it has a back arrow. "⋯" menus open as sheets from the bottom, a conversation gets the whole screen with the message box docked at the bottom, and a thin line along the top shows a page or an action is on its way (the page you're on stays put until the next one is ready).
 
 ## Environment variables (Vercel → Settings → Environment Variables)
 

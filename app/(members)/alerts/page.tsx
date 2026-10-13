@@ -46,7 +46,7 @@ function line(a: Alert): ReactNode {
 
 function href(a: Alert) {
   if (a.kind === 'report') return '/admin?tab=reports';
-  if (a.deal_id) return `/market#d${a.deal_id}`;
+  if (a.deal_id) return `/market?deal=${a.deal_id}#d${a.deal_id}`;
   if (a.chat_id) return `/chat#c${a.chat_id}`;
   if (a.thread_id) return `/forum/t/${a.thread_id}${a.post_id ? `#p${a.post_id}` : ''}`;
   return '/forum';

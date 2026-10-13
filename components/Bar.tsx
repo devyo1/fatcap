@@ -14,7 +14,7 @@ export default function Bar({ me, counts }: { me: User; counts: { messages: numb
             Fatcap<span className="dot">.</span>club
           </Link>
         </span>
-        <QuickNav username={me.username} isAdmin={me.is_admin} initial={counts} />
+        <QuickNav username={me.username} isAdmin={me.is_admin} canAdmin={!!me.can_admin} initial={counts} />
       </div>
       <div className="wrap tabs-wrap">
         <Tabs />
