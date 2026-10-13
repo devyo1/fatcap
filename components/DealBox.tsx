@@ -110,7 +110,7 @@ export default function DealBox({ thread, l, status, me, rep, myRep, bids, offer
               <form action={buy} className="deal-form">
                 <input type="hidden" name="id" value={thread.id} />
                 {left_ > 1 && (
-                  <label className="mono">Quantity <input className="input small-num" type="number" name="quantity" min={1} max={left_} defaultValue={1} /></label>
+                  <label className="mono">Quantity <input className="input small-num" type="number" inputMode="numeric" name="quantity" min={1} max={left_} defaultValue={1} /></label>
                 )}
                 <MethodPicker l={l} />
                 <input className="input" name="note" maxLength={300} placeholder="Note to seller (optional)" autoComplete="off" />
@@ -126,7 +126,7 @@ export default function DealBox({ thread, l, status, me, rep, myRep, bids, offer
                 <input type="hidden" name="id" value={thread.id} />
                 <div className="field-row">
                   <input className="input" name="amount" inputMode="decimal" placeholder={`Amount (${l.currency})`} required={!l.trades} />
-                  {left_ > 1 && <input className="input small-num" type="number" name="quantity" min={1} max={left_} defaultValue={1} aria-label="Quantity" />}
+                  {left_ > 1 && <input className="input small-num" type="number" inputMode="numeric" name="quantity" min={1} max={left_} defaultValue={1} aria-label="Quantity" />}
                 </div>
                 <MethodPicker l={l} />
                 <input className="input" name="note" maxLength={300} placeholder={l.trades ? 'Note, or what you would trade' : 'Note (optional)'} autoComplete="off" />

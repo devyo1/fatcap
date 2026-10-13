@@ -21,3 +21,4 @@ export const NavChat = () => <svg {...nav}><path d="M4 5h16v11H9l-5 4z" /></svg>
 export const NavMarket = () => <svg {...nav}><path d="M3 12V4h8l10 10-8 8z" /><circle cx="7.5" cy="8.5" r="1.4" /></svg>;
 export const NavPlus = () => <svg {...nav} strokeWidth={2}><path d="M12 5v14M5 12h14" /></svg>;
 export const NavSearch = () => <svg {...nav}><circle cx="11" cy="11" r="6" /><path d="m20 20-4.2-4.2" /></svg>;
+export const NavBack = () => <svg {...nav} strokeWidth={1.8}><path d="M15 5l-7 7 7 7" /></svg>;

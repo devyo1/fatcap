@@ -26,6 +26,7 @@ type Outgoing = { id: number; kind: 'offer' | 'bid'; amount_cents: number | null
 
 const METHOD = { ship: 'Shipping', meetup: 'Meetup' } as const;
 const REASON: Record<string, string> = { unpaid: "buyer didn't pay", unavailable: 'no longer available', changed: 'changed their mind', other: 'other' };
+const MY_REASON: Record<string, string> = { ...REASON, changed: 'changed your mind' };
 const myTurn = (d: Deal, me: User) => {
   const step = STEPS[d.method][d.status];
   return !!step && (step.who === 'buyer' ? d.buyer_id : d.seller_id) === me.id;
@@ -58,7 +59,7 @@ function DealCard({ d, me }: { d: Deal; me: User }) {
       {d.note && <p className="dc-note">{d.note}</p>}
 
       {d.status === 'cancelled' ? (
-        <p className="dc-state mono">Cancelled by {d.cancelled_by === me.id ? 'you' : other ?? 'them'}{d.cancel_reason ? `: ${REASON[d.cancel_reason] ?? d.cancel_reason}` : ''}</p>
+        <p className="dc-state mono">Cancelled by {d.cancelled_by === me.id ? 'you' : other ?? 'them'}{d.cancel_reason ? `: ${(d.cancelled_by === me.id ? MY_REASON : REASON)[d.cancel_reason] ?? d.cancel_reason}` : ''}</p>
       ) : (
         <ol className="dc-track mono" aria-label="Progress">
           {track.map((s, i) => <li key={s.status} className={i < at || d.status === 'complete' ? 'done' : i === at ? 'now' : ''}>{s.label}</li>)}
@@ -175,7 +176,7 @@ export default async function Market({ searchParams }: { searchParams: Promise<{
   const TABS = [
     { id: 'todo', name: `To do${todo.length + incoming.length ? ` ${todo.length + incoming.length}` : ''}`, href: '/market' },
     { id: 'listings', name: `Listings ${mine.length}`, href: '/market?tab=listings' },
-    { id: 'offers', name: 'Offers & bids', href: '/market?tab=offers' },
+    { id: 'offers', name: <>Offers<span className="hide-phone"> &amp; bids</span></>, href: '/market?tab=offers' },
     { id: 'history', name: 'History', href: '/market?tab=history' },
   ];
 
@@ -253,7 +254,7 @@ export default async function Market({ searchParams }: { searchParams: Promise<{
                   {(m.mode === 'fixed' || m.mode === 'offers') && (
                     <form action={setStock} className="stock-form mono">
                       <input type="hidden" name="id" value={m.id} /><input type="hidden" name="back" value="/market?tab=listings" />
-                      <label>Left <input className="input small-num" type="number" name="left" min={0} max={999} defaultValue={left_} /></label>
+                      <label>Left <input className="input small-num" type="number" inputMode="numeric" name="left" min={0} max={999} defaultValue={left_} /></label>
                       <button className="linkbtn mono" type="submit">Save</button>
                     </form>
                   )}

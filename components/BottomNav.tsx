@@ -20,23 +20,18 @@ function plusFor(path: string): { href: string; focus?: string; label: string } 
 }
 
 /**
- * Phone tab bar: Forum, Chat, +, Market, Me. Slides away while the keyboard is up, and stays
- * off conversation screens (they own the bottom edge). Counts arrive from the header's poller.
+ * Phone tab bar: Forum, Chat, +, Market, Me. Slides away while the keyboard is up (`html.typing`,
+ * set by PhoneUX), and stays off conversation screens (they own the bottom edge). Counts arrive
+ * from the header's poller.
  */
 export default function BottomNav({ username, initial }: { username: string; initial: Counts }) {
   const path = usePathname();
   const [counts, setCounts] = useState(initial);
-  const [typing, setTyping] = useState(false);
 
   useEffect(() => {
     const onCounts = (e: Event) => setCounts((e as CustomEvent<Counts>).detail);
-    const isField = (t: EventTarget | null) => t instanceof HTMLElement && t.matches('textarea, input:not([type=checkbox]):not([type=radio]):not([type=file]), select, [contenteditable]');
-    const onIn = (e: FocusEvent) => { if (isField(e.target) && matchMedia('(pointer: coarse)').matches) setTyping(true); };
-    const onOut = (e: FocusEvent) => { if (isField(e.target)) setTimeout(() => { if (!isField(document.activeElement)) setTyping(false); }, 80); };
     window.addEventListener('fc:counts', onCounts);
-    document.addEventListener('focusin', onIn);
-    document.addEventListener('focusout', onOut);
-    return () => { window.removeEventListener('fc:counts', onCounts); document.removeEventListener('focusin', onIn); document.removeEventListener('focusout', onOut); };
+    return () => window.removeEventListener('fc:counts', onCounts);
   }, []);
 
   if (/^\/messages\/[^/]+/.test(path)) return null;
@@ -45,16 +40,23 @@ export default function BottomNav({ username, initial }: { username: string; ini
     : path.startsWith(`/u/${encodeURIComponent(username)}`) || path.startsWith('/settings') || path.startsWith('/saved') || path.startsWith('/invite') ? 'me'
     : path.startsWith('/forum') || path.startsWith('/search') ? 'forum' : '';
   const plus = plusFor(path);
-  const tap = () => haptic(6);
+  // Tapping the tab you're already on takes you back to the top, like a native app.
+  const tap = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    haptic(6);
+    if (e.currentTarget.getAttribute('href') === path && window.scrollY > 0) {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   return (
-    <nav className={`bnav${typing ? ' away' : ''}`} aria-label="Main">
+    <nav className="bnav" aria-label="Main">
       <Link href="/forum" onClick={tap} aria-current={sec === 'forum' ? 'page' : undefined}><NavForum /><span>Forum</span></Link>
       <Link href="/chat" onClick={tap} aria-current={sec === 'chat' ? 'page' : undefined}><NavChat /><span>Chat</span></Link>
       <Link
         href={plus.href} className="bnav-plus" aria-label={plus.label}
         onClick={(e) => {
-          tap();
+          haptic(6);
           if (!plus.focus) return;
           const el = document.getElementById(plus.focus) as HTMLTextAreaElement | null;
           if (!el) return;

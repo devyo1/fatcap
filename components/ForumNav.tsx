@@ -8,7 +8,7 @@ type Stats = Map<string, TopicStat>;
 const subsOf = (b: Board) => b.subs as readonly Sub[];
 
 /** Segmented links: Feed / Recent / Top, or Recent / New / Top. */
-export function SortTabs({ items, current, label }: { items: { id: string; name: string; href: string }[]; current: string; label: string }) {
+export function SortTabs({ items, current, label }: { items: { id: string; name: React.ReactNode; href: string }[]; current: string; label: string }) {
   return (
     <nav className="seg-tabs mono" aria-label={label}>
       {items.map((i) => (

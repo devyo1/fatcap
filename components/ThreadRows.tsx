@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ago, left } from '@/lib/format';
-import { placeName, subBySlug } from '@/lib/config';
+import { boardBySlug, subBySlug } from '@/lib/config';
 import Avatar from './Avatar';
 import { mediaUrl } from '@/lib/media-token';
 import { Hourglass, Pin, Lock, Heart, Gavel, Bubble } from './Icons';
@@ -32,7 +32,7 @@ export type ThreadRow = {
 export const preview = (s: string | null | undefined) =>
   (s ?? '').replace(/https?:\/\/\S+/g, '').replace(/(^|\s)(#{1,3}|>|-{3,}|[-*] |\d{1,2}[.)] )/g, ' ').replace(/\*\*?/g, '').replace(/\s+/g, ' ').trim();
 
-/** Little markers shared by rows and listing cards: pinned, locked, vanishing, has pictures. */
+/** Little markers shared by rows and listing cards: pinned, locked, auction clock, vanishing. */
 export function Marks({ t }: { t: ThreadRow }) {
   return (
     <>
@@ -40,10 +40,25 @@ export function Marks({ t }: { t: ThreadRow }) {
       {t.locked && <span className="mark" title="Locked"><Lock /></span>}
       {t.auction_ends && <span className="mark auction" title="Auction, time left"><Gavel />{left(t.auction_ends)}</span>}
       {t.expires_at && <span className="mark vanish" title="Deletes itself"><Hourglass />{left(t.expires_at)}</span>}
-      {t.props ? <span className="mark" title={`${t.props} ${t.props === 1 ? 'like' : 'likes'}`}><Heart />{t.props}</span> : null}
-      {typeof t.reply_count === 'number' && <span className="mark phone-only" title="Comments"><Bubble />{t.reply_count}</span>}
     </>
   );
+}
+
+/** Likes, and on phones (where the comments column is gone) the comment count. */
+export function Counts({ t, comments = true }: { t: ThreadRow; comments?: boolean }) {
+  return (
+    <>
+      {t.props ? <span className="mark" title={`${t.props} ${t.props === 1 ? 'like' : 'likes'}`}><Heart />{t.props}</span> : null}
+      {comments && <span className="mark phone-only" title="Comments"><Bubble />{t.reply_count}</span>}
+    </>
+  );
+}
+
+/** "Board / Sub", where the board half drops off on phones. */
+function Place({ board, topic }: { board: string; topic?: string | null }) {
+  const b = boardBySlug(board)?.name ?? board;
+  const s = subBySlug(board, topic)?.name;
+  return <span className="board-tag">{s ? <><span className="hide-phone">{b} / </span>{s}</> : b}</span>;
 }
 
 /** `showBoard`: tag each row with "Board / Sub". `showTopic`: just the sub (on a board page). */
@@ -62,12 +77,15 @@ export default function ThreadRows({ rows, showBoard = false, showTopic = false,
               </span>
               {preview(t.excerpt) && <span className="ex">{preview(t.excerpt)}</span>}
               <span className="m mono">
-                {showBoard && <span className="board-tag">{placeName(t.board, t.topic)}</span>}
-                {showTopic && t.topic && <span className="board-tag">{subBySlug(t.board, t.topic)?.name}</span>}
-                <span>{t.author ?? 'gone'}</span>
-                <span title={t.last_author && t.reply_count > 0 ? `Last comment by ${t.last_author}` : undefined}>{ago(t.last_post_at)}</span>
-                {t.price && <span className={`price${t.status === 'sold' || t.status === 'ended' || t.status === 'closed' ? ' sold' : ''}`}>{t.status === 'sold' ? 'Sold' : t.status === 'ended' ? 'Ended' : t.status === 'closed' ? 'Closed' : t.price}</span>}
-                <Marks t={t} />
+                <span className="m-a">
+                  {showBoard && <Place board={t.board} topic={t.topic} />}
+                  {showTopic && t.topic && <span className="board-tag">{subBySlug(t.board, t.topic)?.name}</span>}
+                  <span>{t.author ?? 'gone'}</span>
+                  <span title={t.last_author && t.reply_count > 0 ? `Last comment by ${t.last_author}` : undefined}>{ago(t.last_post_at)}</span>
+                  {t.price && <span className={`price${t.status === 'sold' || t.status === 'ended' || t.status === 'closed' ? ' sold' : ''}`}>{t.status === 'sold' ? 'Sold' : t.status === 'ended' ? 'Ended' : t.status === 'closed' ? 'Closed' : t.price}</span>}
+                  <Marks t={t} />
+                </span>
+                <span className="m-n"><Counts t={t} /></span>
               </span>
             </span>
             {t.cover && (

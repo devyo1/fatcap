@@ -3,13 +3,15 @@ import { notFound } from 'next/navigation';
 import { q, one } from '@/lib/db';
 import { requireUser, type User } from '@/lib/auth';
 import { LIMITS, REPORT_REASONS, boardBySlug, subBySlug } from '@/lib/config';
-import { LIVE } from '@/lib/threads';
+import { LIVE, listThreads } from '@/lib/threads';
 import { ago, left } from '@/lib/format';
 import {
   reply, deletePost, deleteThread, editPost, editThread, toggleProps, setThreadFlag, moveThread,
   toggleFollow, toggleSave, toggleSold, report,
 } from '@/app/actions';
-import RichText from '@/components/RichText';
+import RichText, { type MediaInfo } from '@/components/RichText';
+import ThreadRows from '@/components/ThreadRows';
+import ListingGrid from '@/components/ListingGrid';
 import Avatar from '@/components/Avatar';
 import Notice from '@/components/Notice';
 import Writer from '@/components/Writer';
@@ -99,8 +101,8 @@ function count(kids: Map<number, Post[]>, id: number): number {
   return (kids.get(id) ?? []).reduce((n, c) => n + 1 + count(kids, c.id), 0);
 }
 
-function Comment({ post, kids, depth, me, threadId, locked, since, mode, blocked }: {
-  post: Post; kids: Map<number, Post[]>; depth: number; me: User; threadId: number; locked: boolean; since: number | null; mode: Mode; blocked: Set<number>;
+function Comment({ post, kids, depth, me, threadId, locked, since, mode, blocked, media }: {
+  post: Post; kids: Map<number, Post[]>; depth: number; me: User; threadId: number; locked: boolean; since: number | null; mode: Mode; blocked: Set<number>; media: MediaInfo;
 }) {
   const fresh = isFresh(post, me, since);
   const children = kids.get(post.id) ?? [];
@@ -111,7 +113,7 @@ function Comment({ post, kids, depth, me, threadId, locked, since, mode, blocked
   const reporting = mode.report === `p${post.id}` && !own && !post.deleted;
   const nested = children.length > 0 && (
     <div className={depth < MAX_DEPTH ? 'kids' : 'kids flat'}>
-      {children.map((c) => <Comment key={c.id} post={c} kids={kids} depth={depth + 1} me={me} threadId={threadId} locked={locked} since={since} mode={mode} blocked={blocked} />)}
+      {children.map((c) => <Comment key={c.id} post={c} kids={kids} depth={depth + 1} me={me} threadId={threadId} locked={locked} since={since} mode={mode} blocked={blocked} media={media} />)}
     </div>
   );
 
@@ -146,7 +148,7 @@ function Comment({ post, kids, depth, me, threadId, locked, since, mode, blocked
             <button className="btn solid small" type="submit">Save</button>
           </Writer>
         </form>
-      ) : <RichText text={post.body} />}
+      ) : <RichText text={post.body} media={media} />}
       {!editing && (
         <div className="acts">
           <LikeButton target="post" id={post.id} count={post.props} mine={post.mine} back={anchor} />
@@ -197,23 +199,37 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
     [id, me.id],
   );
   if (!thread) notFound();
-  const posts = await q<Post>(
-    `SELECT p.id, p.parent_id, p.body, p.user_id, u.username AS author, p.created_at, p.edited_at, p.deleted,
-            (SELECT count(*)::int FROM props WHERE target = 'post' AND target_id = p.id) AS props,
-            EXISTS (SELECT 1 FROM props WHERE target = 'post' AND target_id = p.id AND member_id = $2) AS mine
-       FROM posts p LEFT JOIN members u ON u.id = p.user_id
-      WHERE p.thread_id = $1 ORDER BY p.created_at LIMIT 1000`,
-    [id, me.id],
-  );
-  const blocked = new Set((await q<{ id: number }>('SELECT blocked_id AS id FROM blocks WHERE blocker_id = $1', [me.id])).map((b) => b.id));
-  // When you last had this thread open, so comments since then can be marked (first visit: nothing is marked).
-  const seen = await one<{ read_at: string }>('SELECT read_at FROM thread_reads WHERE member_id = $1 AND thread_id = $2', [me.id, id]);
+  const [posts, blockedRows, seen, nearby] = await Promise.all([
+    q<Post>(
+      `SELECT p.id, p.parent_id, p.body, p.user_id, u.username AS author, p.created_at, p.edited_at, p.deleted,
+              (SELECT count(*)::int FROM props WHERE target = 'post' AND target_id = p.id) AS props,
+              EXISTS (SELECT 1 FROM props WHERE target = 'post' AND target_id = p.id AND member_id = $2) AS mine
+         FROM posts p LEFT JOIN members u ON u.id = p.user_id
+        WHERE p.thread_id = $1 ORDER BY p.created_at LIMIT 1000`,
+      [id, me.id],
+    ),
+    q<{ id: number }>('SELECT blocked_id AS id FROM blocks WHERE blocker_id = $1', [me.id]),
+    // When you last had this thread open, so comments since then can be marked (first visit: nothing is marked).
+    one<{ read_at: string }>('SELECT read_at FROM thread_reads WHERE member_id = $1 AND thread_id = $2', [me.id, id]),
+    // What to read next: the latest from the same sub-forum.
+    listThreads(me, { board: thread.board, topic: thread.topic ?? undefined, sort: 'recent', limit: 7 }),
+  ]);
+  const blocked = new Set(blockedRows.map((b) => b.id));
   const since = seen ? new Date(seen.read_at).getTime() : null;
-  await q(
-    `INSERT INTO thread_reads (member_id, thread_id, read_at) VALUES ($1, $2, now())
-     ON CONFLICT (member_id, thread_id) DO UPDATE SET read_at = now()`,
-    [me.id, id],
-  );
+  // The pictures on this page, by size, so they hold their space while loading and come in a size
+  // that suits the screen. (Marking the thread read happens alongside.)
+  const picIds = [...new Set([thread.body, ...posts.map((p) => p.body)].flatMap(mediaIn))];
+  const [media] = await Promise.all([
+    picIds.length
+      ? q<{ id: string; width: number; height: number; animated: boolean }>('SELECT id, width, height, animated FROM media WHERE id = ANY($1::text[])', [picIds])
+          .then((rows) => Object.fromEntries(rows.map((m) => [m.id, { w: m.width, h: m.height, anim: m.animated }])) as MediaInfo)
+      : Promise.resolve({} as MediaInfo),
+    q(
+      `INSERT INTO thread_reads (member_id, thread_id, read_at) VALUES ($1, $2, now())
+       ON CONFLICT (member_id, thread_id) DO UPDATE SET read_at = now()`,
+      [me.id, id],
+    ),
+  ]);
 
   // Build the comment tree. Deleted comments only show if something hangs off them.
   const ids = new Set(posts.map((p) => p.id));
@@ -269,6 +285,8 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
   }
   const text = zine.length >= 2 ? thread.body.split('\n').filter((line) => !MEDIA_LINE.test(line.trim())).join('\n') : thread.body;
   const cents = (c: number | null) => (c == null ? '' : (c / 100).toFixed(c % 100 ? 2 : 0));
+  const next = nearby.rows.filter((t) => t.id !== thread.id).slice(0, market ? 4 : 5);
+  const placeLabel = sub?.name ?? board?.name ?? 'the forum';
 
   return (
     <>
@@ -345,8 +363,8 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
             <div className="actions"><button className="btn solid small" type="submit">Save</button><Link className="mono mute" href={here}>Cancel</Link></div>
           </form>
         ) : thread.user_id && blocked.has(thread.user_id) ? (
-          <details className="blocked-post"><summary className="mono mute">Posted by a member you blocked. Show anyway</summary><RichText text={text} /></details>
-        ) : <RichText text={text} />}
+          <details className="blocked-post"><summary className="mono mute">Posted by a member you blocked. Show anyway</summary><RichText text={text} media={media} /></details>
+        ) : <RichText text={text} media={media} />}
 
         {!editing && (
           <div className="acts">
@@ -412,11 +430,21 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
           </form>
         )}
         {roots.length ? (
-          roots.map((p) => <Comment key={p.id} post={p} kids={kids} depth={1} me={me} threadId={thread.id} locked={locked} since={since} mode={mode} blocked={blocked} />)
+          roots.map((p) => <Comment key={p.id} post={p} kids={kids} depth={1} me={me} threadId={thread.id} locked={locked} since={since} mode={mode} blocked={blocked} media={media} />)
         ) : (
           <p className="empty mono">No comments.</p>
         )}
       </section>
+
+      {next.length > 0 && (
+        <section className="section keep-reading" aria-label={`More in ${placeLabel}`}>
+          <div className="sec-head mono">
+            <span className="br">More in {placeLabel}</span>
+            <Link href={sub ? `/forum/${thread.board}/${sub.slug}` : `/forum/${thread.board}`}>All &rarr;</Link>
+          </div>
+          {market ? <ListingGrid rows={next} empty="" /> : <ThreadRows rows={next} empty="" />}
+        </section>
+      )}
     </>
   );
 }

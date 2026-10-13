@@ -101,7 +101,7 @@ export default function ListingForm({ action, defaults = {}, id, frozen = false,
           {(m === 'fixed' || m === 'offers') && (
             <div className="field">
               <label className="mono" htmlFor="quantity">In stock</label>
-              <input className="input" id="quantity" name="quantity" type="number" min={1} max={999} defaultValue={defaults.quantity ?? 1} />
+              <input className="input" id="quantity" name="quantity" type="number" inputMode="numeric" min={1} max={999} defaultValue={defaults.quantity ?? 1} />
             </div>
           )}
         </div>

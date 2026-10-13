@@ -7,6 +7,9 @@ import Avatar from '@/components/Avatar';
 import Notice from '@/components/Notice';
 import { SortTabs, ForumTree, BoardChips } from '@/components/ForumNav';
 import Pulse from '@/components/Pulse';
+import MoreRows from '@/components/MoreRows';
+
+const BATCH = 25;
 
 export const metadata = { title: 'Forum' };
 
@@ -21,8 +24,8 @@ export default async function Forum({ searchParams }: { searchParams: Promise<{ 
   const { welcome, view: rawView } = await searchParams;
   const view = rawView === 'recent' || rawView === 'top' ? rawView : 'feed';
 
-  const [rows, stats, online, totals, tags] = await Promise.all([
-    view === 'feed' ? feedThreads(me, 25) : listThreads(me, { sort: view, limit: 25 }).then((r) => r.rows),
+  const [feed, stats, online, totals, tags] = await Promise.all([
+    view === 'feed' ? feedThreads(me, BATCH + 1) : listThreads(me, { sort: view, limit: BATCH + 1 }).then((r) => r.rows),
     topicStats(me),
     q<{ username: string }>(`SELECT username FROM members WHERE last_seen_at > now() - interval '15 minutes' AND NOT banned ORDER BY last_seen_at DESC LIMIT 24`),
     one<{ members: number; threads: number; comments: number }>(
@@ -32,6 +35,7 @@ export default async function Forum({ searchParams }: { searchParams: Promise<{ 
     ),
     popularTags(12),
   ]);
+  const rows = feed.slice(0, BATCH);
 
   return (
     <>
@@ -40,7 +44,7 @@ export default async function Forum({ searchParams }: { searchParams: Promise<{ 
         <div>
           <h1 className="title">Forum</h1>
           <p className="mono mute stat-line">
-            {totals?.members ?? 0} members / {totals?.threads ?? 0} threads / {totals?.comments ?? 0} comments / {online.length} online
+            {totals?.members ?? 0} members / {totals?.threads ?? 0} threads<span className="hide-phone"> / {totals?.comments ?? 0} comments</span> / {online.length} online
           </p>
         </div>
         <Link className="btn solid hide-phone" href="/forum/general/new">New thread</Link>
@@ -52,6 +56,7 @@ export default async function Forum({ searchParams }: { searchParams: Promise<{ 
         <section>
           <SortTabs label="Feed" items={VIEWS} current={view} />
           <ThreadRows rows={rows} showBoard empty={view === 'top' ? 'Nothing this month.' : 'No threads yet.'} />
+          {feed.length > BATCH && <MoreRows key={view} query={{ view }} start={BATCH} have={rows.map((r) => r.id)} size={BATCH} showBoard />}
         </section>
 
         <aside className="side">

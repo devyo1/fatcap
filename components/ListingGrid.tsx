@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { mediaUrl } from '@/lib/media-token';
 import { subBySlug } from '@/lib/config';
 import type { ThreadRow } from './ThreadRows';
-import { Marks } from './ThreadRows';
+import { Marks, Counts } from './ThreadRows';
 
 /** Market threads as cards: cover (the first picture in the post), title, price, seller. */
 export default function ListingGrid({ rows, empty, showTopic = false }: { rows: ThreadRow[]; empty: string; showTopic?: boolean }) {
@@ -27,7 +27,8 @@ export default function ListingGrid({ rows, empty, showTopic = false }: { rows: 
                 <span className="price">{t.price || '—'}</span>
                 {showTopic && t.topic && <span>{subBySlug(t.board, t.topic)?.name}</span>}
                 <span>{t.author ?? 'gone'}</span>
-                <Marks t={{ ...t, cover: null }} />
+                <Marks t={t} />
+                <Counts t={t} comments={false} />
               </span>
             </Link>
           </li>

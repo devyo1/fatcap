@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Avatar from '@/components/Avatar';
 import { redirect } from 'next/navigation';
 import { q } from '@/lib/db';
 import { requireUser, usernameKey } from '@/lib/auth';
@@ -40,7 +41,7 @@ export default async function Messages() {
         <h1 className="title">Messages</h1>
         <form action={startWith} className="newdm">
           <label className="sr" htmlFor="to">Message a member</label>
-          <input className="input" id="to" name="to" placeholder="Username" autoComplete="off" autoCapitalize="none" spellCheck={false} required />
+          <input className="input" id="to" name="to" placeholder="Username" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go" required />
           <button className="btn small" type="submit">Message</button>
         </form>
       </div>
@@ -48,10 +49,15 @@ export default async function Messages() {
         <ul className="rows">
           {convs.map((c) => (
             <li key={c.id}>
-              <Link className={`row${c.unread ? ' unread' : ''}`} href={`/messages/${encodeURIComponent(c.other)}`}>
-                <span className="t">{c.unread && <span className="new" aria-label="Unread" />}{c.other}</span>
-                <span className="n mono">{ago(c.last_message_at)}</span>
-                <span className="m snippet">{c.from_me ? 'You: ' : ''}{plain(c.snippet ?? '').slice(0, 140)}</span>
+              <Link className={`row conv${c.unread ? ' unread' : ''}`} href={`/messages/${encodeURIComponent(c.other)}`}>
+                <Avatar name={c.other} size={40} />
+                <span className="conv-main">
+                  <span className="conv-top">
+                    <span className="t">{c.unread && <span className="new" aria-label="Unread" />}{c.other}</span>
+                    <span className="n mono">{ago(c.last_message_at)}</span>
+                  </span>
+                  <span className="snippet">{c.from_me ? 'You: ' : ''}{plain(c.snippet ?? '').slice(0, 140)}</span>
+                </span>
               </Link>
             </li>
           ))}

@@ -63,6 +63,7 @@ export default async function InvitePage({ searchParams }: { searchParams: Promi
               <a className="btn" href={file('svg')} download>SVG</a>
             </div>
             <div className="actions">
+              <ShareButton url={url} file={`/api/sticker?format=png&dot=${dot}&paper=${paper}`} />
               <ShareButton url={url} />
               <CopyButton text={url} />
             </div>

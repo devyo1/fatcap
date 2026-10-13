@@ -43,7 +43,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
       <div className="head"><h1 className="title">Search</h1></div>
       <form className="searchbar" action="/search" role="search">
         <label className="sr" htmlFor="q">Search threads, comments and members</label>
-        <input className="input" id="q" name="q" defaultValue={term} placeholder="Threads, comments, @members" autoComplete="off" />
+        <input className="input" id="q" name="q" type="search" defaultValue={term} placeholder="Threads, comments, @members" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="search" autoFocus={!term} />
         <button className="btn" type="submit">Search</button>
       </form>
 

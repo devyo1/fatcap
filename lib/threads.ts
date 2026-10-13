@@ -48,17 +48,18 @@ const ORDER: Record<Sort, string> = {
 };
 
 /** Threads for a board / sub-forum (or everything), with an unread flag for `me`. Pinned first on Recent. */
-export async function listThreads(me: User, opts: { board?: string; topic?: string; sort?: Sort; page?: number; limit?: number } = {}) {
+export async function listThreads(me: User, opts: { board?: string; topic?: string; sort?: Sort; page?: number; limit?: number; offset?: number } = {}) {
   const limit = opts.limit ?? PAGE_SIZE;
   const page = Math.max(1, opts.page ?? 1);
+  const offset = Math.max(0, opts.offset ?? (page - 1) * limit);
   const sort = opts.sort ?? 'recent';
   const rows = await q<ThreadRow>(
     `SELECT ${COLUMNS} ${FROM}
       WHERE ${LIVE} AND ${UNBLOCKED} AND ($3::text IS NULL OR t.board = $3) AND ($6::text IS NULL OR t.topic = $6)
         ${sort === 'top' ? `AND t.created_at > now() - interval '30 days'` : ''}
-      ORDER BY ${opts.board && sort === 'recent' ? 't.pinned DESC,' : ''} ${ORDER[sort]}
+      ORDER BY ${opts.board && sort === 'recent' ? 't.pinned DESC,' : ''} ${ORDER[sort]}, t.id DESC
       LIMIT $4 OFFSET $5`,
-    [me.id, me.created_at, opts.board ?? null, limit + 1, (page - 1) * limit, opts.topic ?? null],
+    [me.id, me.created_at, opts.board ?? null, limit + 1, offset, opts.topic ?? null],
   );
   return { rows: rows.slice(0, limit), more: rows.length > limit, page };
 }
@@ -69,16 +70,16 @@ export async function listThreads(me: User, opts: { board?: string; topic?: stri
  * and busy threads stay up a while. Threads you haven't opened get a lift; ones you've fully
  * read sink a little, so the feed keeps moving.
  */
-export async function feedThreads(me: User, limit = 25) {
+export async function feedThreads(me: User, limit = 25, offset = 0) {
   return q<ThreadRow>(
     `SELECT ${COLUMNS} ${FROM}
       WHERE ${LIVE} AND ${UNBLOCKED} AND t.last_post_at > now() - interval '120 days'
       ORDER BY
         (1 + ${ENGAGEMENT} + CASE WHEN t.body ~ '\\[img:' THEN 2 ELSE 0 END)
         * CASE WHEN r.read_at IS NULL THEN 1.25 WHEN r.read_at < t.last_post_at THEN 1.1 ELSE 0.55 END
-        / power(extract(epoch FROM now() - t.last_post_at) / 3600.0 + 2, 1.35) DESC
-      LIMIT $3`,
-    [me.id, me.created_at, limit],
+        / power(extract(epoch FROM now() - t.last_post_at) / 3600.0 + 2, 1.35) DESC, t.id DESC
+      LIMIT $3 OFFSET $4`,
+    [me.id, me.created_at, limit, offset],
   );
 }
 

@@ -8,6 +8,7 @@ import { sendMessage } from '@/app/actions';
 import RichText from '@/components/RichText';
 import Notice from '@/components/Notice';
 import Writer from '@/components/Writer';
+import Avatar from '@/components/Avatar';
 import { RefreshEvery, ScrollToEnd } from '@/components/Live';
 
 type Msg = { id: number; sender_id: number | null; body: string; created_at: string };
@@ -47,13 +48,17 @@ export default async function Conversation({ params, searchParams }: { params: P
   }
 
   return (
-    <>
+    <div className="dm-page">
       <RefreshEvery seconds={8} />
-      <nav className="crumbs mono" aria-label="Breadcrumb">
+      <nav className="crumbs mono hide-phone" aria-label="Breadcrumb">
         <Link href="/messages">Messages</Link><span>/</span><span>{other.username}</span>
       </nav>
-      <div className="head">
-        <h1 className="title"><Link href={`/u/${encodeURIComponent(other.username)}`}>{other.username}</Link></h1>
+      <div className="head dm-head">
+        <Link className="dm-back show-sm-flex" href="/messages" aria-label="All messages">&larr;</Link>
+        <Link className="dm-who" href={`/u/${encodeURIComponent(other.username)}`}>
+          <Avatar name={other.username} size={36} />
+          <h1 className="title">{other.username}</h1>
+        </Link>
         <span className="mono mute">Private</span>
       </div>
 
@@ -72,11 +77,11 @@ export default async function Conversation({ params, searchParams }: { params: P
       <form action={sendMessage} className="dm-compose">
         <input type="hidden" name="to" value={other.username} />
         <label className="sr" htmlFor="msg">Message {other.username}</label>
-        <Writer id="msg" rows={2} maxLength={LIMITS.message} placeholder={`Message ${other.username}`} defaultValue={listing ? `Re: ${listing.title}\n${SITE_URL}/forum/t/${listing.id}\n\n` : undefined}>
+        <Writer id="msg" rows={1} maxLength={LIMITS.message} placeholder={`Message ${other.username}`} previewable={false} defaultValue={listing ? `Re: ${listing.title}\n${SITE_URL}/forum/t/${listing.id}\n\n` : undefined}>
           <button className="btn solid small" type="submit">Send</button>
         </Writer>
       </form>
       )}
-    </>
+    </div>
   );
 }

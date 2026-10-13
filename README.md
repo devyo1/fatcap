@@ -20,6 +20,8 @@ They don't pile up: pictures in a thread's opening post last as long as the thre
 - **Tree:** General, Travel, Lifestyle and Market, three sub-forums each, defined in `lib/config.ts` (rename or reorder there, no migration needed). New threads pick a sub-forum. Threads from before sub-forums existed show under their board's "All" until moved (admins: **Move** in the thread's menu; authors: **Edit**).
 - **Feed:** the forum home ranks threads by engagement (comments, likes, how many people joined in, pictures) over time since the last comment, with a lift for threads you haven't opened. **Recent** and **Top** (last 30 days) are one tap away; boards sort by Recent / New / Top. Rows show the opening lines and the first picture. While a page is open, a pill appears when there are new threads (feed) or new comments (thread); tap it to load them.
 - **Tags:** `#anything` in a post becomes a link to every thread using it; the forum home lists the most used ones from the last 60 days.
+- **Browsing:** the feed, boards and Market keep loading as you scroll (past 150 rows it waits for a tap). Going into a thread and coming back keeps your place, with everything that had loaded. A thread ends with more from the same sub-forum.
+- **Pictures in posts** hold their space while they load (nothing jumps while you scroll), and phones get a copy sized for the screen. Animations always get the original; the full picture opens in the viewer.
 - **Vanishing threads:** a thread can delete itself after 24 hours, 7 days or 30 days, taking every comment, like, alert and picture with it.
 - **Follow / Save:** you follow threads you start or comment in, and get one alert per thread that updates as comments come in. Unfollow from the thread. Saved threads are private, under the avatar menu.
 - **Reports:** members report a thread or comment (spam, harassment, personal info, other); admins get an alert and work through them under Admin -> Reports.
@@ -50,7 +52,7 @@ Members sell and trade with each other; no money moves through the site. Everyth
 
 The site ships a web app manifest, so "Add to Home Screen" on iPhone/Android gives a full-screen app that stays inside the site and opens on the forum. Pull down from the top of any page to refresh. If you added the shortcut before this existed, delete it and add it again.
 
-On phones a tab bar sits at the bottom: Forum, Chat, **+** (new thread or listing where you are, or jumps to the reply box in a thread or chat), Market (dot when something's waiting on you) and your profile. It tucks away while you type.
+On phones a tab bar sits at the bottom: Forum, Chat, **+** (new thread or listing where you are, or jumps to the reply box in a thread or chat), Market (dot when something's waiting on you) and your profile. It tucks away while you type, and tapping the tab you're on goes back to the top. The header slides away while you scroll down and comes back when you scroll up; below the top level it has a back arrow. "⋯" menus open as sheets from the bottom, a conversation gets the whole screen with the message box docked at the bottom, and pages show a loading state the moment you tap.
 
 ## Environment variables (Vercel → Settings → Environment Variables)
 

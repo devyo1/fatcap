@@ -7,13 +7,14 @@ import { openDeals } from '@/lib/market';
 import ThreadRows from '@/components/ThreadRows';
 import ListingGrid from '@/components/ListingGrid';
 import OpenDeals from '@/components/OpenDeals';
+import MoreRows from '@/components/MoreRows';
 import { SortTabs, SubForums } from '@/components/ForumNav';
 
 /**
  * A board (its sub-forums as rows, then every thread in it), or one sub-forum (a strip to hop
  * between siblings, then its threads). Market shows cards instead of rows.
  */
-export default async function BoardView({ boardSlug, subSlug, page: pageParam, sort: sortParam }: { boardSlug: string; subSlug?: string; page?: string; sort?: string }) {
+export default async function BoardView({ boardSlug, subSlug, sort: sortParam }: { boardSlug: string; subSlug?: string; sort?: string }) {
   const me = await requireUser();
   const board = boardBySlug(boardSlug);
   if (!board) notFound();
@@ -21,22 +22,17 @@ export default async function BoardView({ boardSlug, subSlug, page: pageParam, s
   if (subSlug && !sub) notFound();
   const sort = sortOf(sortParam);
 
-  const [{ rows, more, page }, stats, open] = await Promise.all([
-    listThreads(me, { board: board.slug, topic: sub?.slug, sort, page: Number(pageParam) || 1, limit: board.market ? 24 : undefined }),
+  const size = board.market ? 24 : 30;
+  const [{ rows, more }, stats, open] = await Promise.all([
+    listThreads(me, { board: board.slug, topic: sub?.slug, sort, limit: size }),
     topicStats(me, board.slug),
     board.market ? openDeals(me.id) : null,
   ]);
   const waiting = open ? open.deals.filter((d) => d.next).length + open.offers : 0;
   const base = sub ? `/forum/${board.slug}/${sub.slug}` : `/forum/${board.slug}`;
-  const at = (o: { sort?: string; page?: number }) => {
-    const p = new URLSearchParams();
-    if ((o.sort ?? sort) !== 'recent') p.set('sort', o.sort ?? sort);
-    if (o.page && o.page > 1) p.set('page', String(o.page));
-    const qs = p.toString();
-    return qs ? `${base}?${qs}` : base;
-  };
+  const at = (s: string) => (s === 'recent' ? base : `${base}?sort=${s}`);
   const subs = board.subs as readonly Sub[];
-  const empty = page > 1 ? 'Nothing further back.' : 'Nothing here yet.';
+  const empty = 'Nothing here yet.';
 
   return (
     <>
@@ -74,17 +70,16 @@ export default async function BoardView({ boardSlug, subSlug, page: pageParam, s
 
       <div className="list-head">
         <span className="mono mute br">{sub ? 'Threads' : `All of ${board.name}`}</span>
-        <SortTabs label="Sort" current={sort} items={SORTS.map((s) => ({ id: s.id, name: s.name, href: at({ sort: s.id }) }))} />
+        <SortTabs label="Sort" current={sort} items={SORTS.map((s) => ({ id: s.id, name: s.name, href: at(s.id) }))} />
       </div>
       {board.market
         ? <ListingGrid rows={rows} showTopic={!sub} empty={empty} />
         : <ThreadRows rows={rows} showTopic={!sub} empty={empty} />}
-      {(page > 1 || more) && (
-        <nav className="pager mono" aria-label="Pages">
-          {page > 1 ? <Link href={at({ page: page - 1 })}>&larr; Newer</Link> : <span />}
-          <span className="mute">Page {page}</span>
-          {more ? <Link href={at({ page: page + 1 })}>Older &rarr;</Link> : <span />}
-        </nav>
+      {more && (
+        <MoreRows
+          key={`${board.slug}/${sub?.slug ?? ''}/${sort}`} query={{ board: board.slug, topic: sub?.slug, sort }}
+          start={size} have={rows.map((r) => r.id)} size={size} grid={board.market} showTopic={!sub}
+        />
       )}
     </>
   );

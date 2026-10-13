@@ -107,7 +107,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ name: 
           {!own && !blocked && <Link className="btn solid" href={`/messages/${encodeURIComponent(p.username)}`}>Message</Link>}
           {!own && (
             <details className="menu">
-              <summary className="btn small" aria-label="More">&middot;&middot;&middot;</summary>
+              <summary className="btn icon" aria-label="More">&middot;&middot;&middot;</summary>
               <form action={toggleBlock} className="menu-panel mono right">
                 <input type="hidden" name="name" value={p.username} />
                 <button type="submit" className={blocked ? '' : 'danger'}>{blocked ? 'Unblock' : 'Block'}</button>

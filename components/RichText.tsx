@@ -87,7 +87,34 @@ export function parse(text: string): Block[] {
   return blocks.filter((b) => !(b.t === 'p' && !b.lines.length));
 }
 
-export default function RichText({ text, className = 'body' }: { text: string; className?: string }) {
+/** What the server knows about an uploaded image: its size, and whether it moves. */
+export type MediaInfo = Record<string, { w: number; h: number; anim: boolean }>;
+
+/**
+ * How an image in a post loads. With its size known, the space is held before it arrives (no
+ * jumping while you scroll) and stills come in a size that suits the screen; animations always
+ * get the original (the smaller copies are first frames).
+ */
+function picAttrs(id: string, info: MediaInfo[string] | undefined, sizes: string) {
+  const url = mediaUrl(id);
+  if (!info) return { src: url };
+  const dims = { width: info.w, height: info.h };
+  if (info.anim || info.w <= 480) return { src: url, ...dims };
+  return {
+    src: info.w > 960 ? `${url}?w=960` : url,
+    srcSet: `${url}?w=480 480w, ${info.w > 960 ? `${url}?w=960 960w, ` : ''}${url} ${info.w}w`,
+    sizes, ...dims,
+  };
+}
+
+const SIZES = {
+  one: '(max-width: 760px) calc(100vw - 32px), 640px',
+  half: '(max-width: 760px) 50vw, 320px',
+  third: '(max-width: 760px) 50vw, 214px',
+  lead: '(max-width: 760px) calc(100vw - 32px), 214px',
+};
+
+export default function RichText({ text, className = 'body', media }: { text: string; className?: string; media?: MediaInfo }) {
   return (
     <div className={className}>
       {parse(text).map((b, k) => {
@@ -99,7 +126,10 @@ export default function RichText({ text, className = 'body' }: { text: string; c
                   <figure key={i} className="fig">
                     <a className="pic" href={mediaUrl(p.id)} target="_blank" rel="noopener">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={mediaUrl(p.id)} alt={p.caption} loading="lazy" decoding="async" />
+                      <img
+                        {...picAttrs(p.id, media?.[p.id], b.pics.length === 1 ? SIZES.one : b.pics.length === 2 ? SIZES.half : i === 0 ? SIZES.lead : SIZES.third)}
+                        alt={p.caption} loading="lazy" decoding="async"
+                      />
                     </a>
                     {p.caption && <figcaption>{inline(p.caption, `c${k}-${i}`)}</figcaption>}
                   </figure>

@@ -275,7 +275,7 @@ export default function ChatRoom({ me, isAdmin, initial, reactions: firstReactio
         <GifButton className="attach gif-attach" onFile={(f) => pick(f)} />
         <label className="sr" htmlFor="chat-input">Message everyone</label>
         <textarea
-          id="chat-input" ref={inputRef} className="textarea" rows={1} maxLength={max} value={text} placeholder="Message everyone"
+          id="chat-input" ref={inputRef} className="textarea" rows={1} maxLength={max} value={text} placeholder="Message everyone" enterKeyHint="send"
           onChange={(e) => setText(e.target.value)}
           onPaste={(e) => { const f = [...e.clipboardData.files].find((x) => x.type.startsWith('image/')); if (f) { e.preventDefault(); pick(f); } }}
           onKeyDown={(e) => {

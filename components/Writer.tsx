@@ -10,9 +10,9 @@ import RichText from './RichText';
  * with Image, GIF and Preview. Preview shows the post as it will look, pictures in place.
  * `children` sit at the right end of the bar (usually the submit button).
  */
-export default function Writer({ id, name = 'body', rows = 4, maxLength, placeholder, defaultValue, draft = true, autoFocus, hint, children }: {
+export default function Writer({ id, name = 'body', rows = 4, maxLength, placeholder, defaultValue, draft = true, autoFocus, hint, previewable = true, children }: {
   id: string; name?: string; rows?: number; maxLength: number; placeholder?: string; defaultValue?: string;
-  draft?: boolean; autoFocus?: boolean; hint?: string; children?: React.ReactNode;
+  draft?: boolean; autoFocus?: boolean; hint?: string; previewable?: boolean; children?: React.ReactNode;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -50,10 +50,12 @@ export default function Writer({ id, name = 'body', rows = 4, maxLength, placeho
         <span className="writer-tools">
           <Attach target={id} />
           <GifButton target={id} />
-          <button
-            type="button" className={`chip${preview !== null ? ' on' : ''}`} aria-pressed={preview !== null}
-            onClick={() => setPreview((p) => (p === null ? ref.current?.value ?? '' : null))}
-          >{preview === null ? 'Preview' : 'Write'}</button>
+          {previewable && (
+            <button
+              type="button" className={`chip${preview !== null ? ' on' : ''}`} aria-pressed={preview !== null}
+              onClick={() => setPreview((p) => (p === null ? ref.current?.value ?? '' : null))}
+            >{preview === null ? 'Preview' : 'Write'}</button>
+          )}
         </span>
         {hint && <span className="hint mono writer-hint">{hint}</span>}
         {children && <span className="writer-end">{children}</span>}

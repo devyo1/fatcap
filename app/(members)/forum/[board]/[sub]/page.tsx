@@ -9,5 +9,5 @@ export async function generateMetadata({ params }: { params: Promise<{ board: st
 export default async function SubBoard({ params, searchParams }: { params: Promise<{ board: string; sub: string }>; searchParams: Promise<{ page?: string; sort?: string }> }) {
   const { board, sub } = await params;
   const sp = await searchParams;
-  return <BoardView boardSlug={board} subSlug={sub} page={sp.page} sort={sp.sort} />;
+  return <BoardView boardSlug={board} subSlug={sub} sort={sp.sort} />;
 }

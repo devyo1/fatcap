@@ -252,7 +252,7 @@ async function Stickers() {
         <div className="bh mono"><span>New batch</span><span className="mute">One-time QR codes</span></div>
         <div className="bb stack" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="field"><label className="mono" htmlFor="batch">Batch name</label><input className="input" id="batch" name="batch" placeholder="e.g. plateau drop" maxLength={40} /></div>
-          <div className="field"><label className="mono" htmlFor="count">How many</label><input className="input" id="count" name="count" type="number" min={1} max={200} defaultValue={24} required /></div>
+          <div className="field"><label className="mono" htmlFor="count">How many</label><input className="input" id="count" name="count" type="number" inputMode="numeric" min={1} max={200} defaultValue={24} required /></div>
           <div className="actions"><button className="btn solid" type="submit">Make + open sheet</button></div>
         </div>
       </form>

@@ -5,6 +5,7 @@ import Drafts from '@/components/Drafts';
 import Lightbox from '@/components/Lightbox';
 import MentionAssist from '@/components/MentionAssist';
 import Popovers from '@/components/Popovers';
+import PhoneUX from '@/components/PhoneUX';
 import { AvatarProvider } from '@/components/Avatar';
 import { requireUser } from '@/lib/auth';
 import { q } from '@/lib/db';
@@ -33,6 +34,7 @@ export default async function MembersLayout({ children }: { children: React.Reac
         <MentionAssist />
         <Lightbox />
         <Popovers />
+        <PhoneUX />
       </PullToRefresh>
       <BottomNav username={me.username} initial={counts} />
     </AvatarProvider>
