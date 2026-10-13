@@ -280,7 +280,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   return (
     <>
       <div className="head">
-        <h1 className="wide h1">Admin</h1>
+        <h1 className="title">Admin</h1>
       </div>
       <nav className="subtabs mono big" aria-label="Admin sections">
         {TABS.map((t) => <Link key={t.id} href={`/admin?tab=${t.id}`} aria-current={tab === t.id ? 'page' : undefined}>{t.name}</Link>)}

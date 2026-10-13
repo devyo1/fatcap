@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { BOARDS, CITY, LIMITS, boardBySlug } from '@/lib/config';
+import { BOARDS, LIMITS, boardBySlug } from '@/lib/config';
 import { createThread } from '@/app/actions';
 import Notice from '@/components/Notice';
 
@@ -14,9 +14,9 @@ export default async function NewThread({ params, searchParams }: { params: Prom
   return (
     <>
       <nav className="crumbs mono" aria-label="Breadcrumb">
-        <Link href="/forum">{CITY}</Link><span>/</span><Link href={`/forum/${board.slug}`}>{board.name}</Link><span>/</span><span>New</span>
+        <Link href="/forum">Forum</Link><span>/</span><Link href={`/forum/${board.slug}`}>{board.name}</Link><span>/</span><span>New</span>
       </nav>
-      <div className="head"><h1 className="wide h1">New thread</h1></div>
+      <div className="head"><h1 className="title">New thread</h1></div>
       <Notice error={error} />
       <form action={createThread} className="stack" style={{ marginTop: 24 }}>
         <div className="field">

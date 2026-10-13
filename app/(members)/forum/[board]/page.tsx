@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
-import { CITY, boardBySlug } from '@/lib/config';
+import { boardBySlug } from '@/lib/config';
 import { listThreads } from '@/lib/threads';
 import ThreadRows from '@/components/ThreadRows';
 
@@ -19,11 +19,11 @@ export default async function Board({ params, searchParams }: { params: Promise<
   return (
     <>
       <nav className="crumbs mono" aria-label="Breadcrumb">
-        <Link href="/forum">{CITY}</Link><span>/</span><span>{board.name}</span>
+        <Link href="/forum">Forum</Link><span>/</span><span>{board.name}</span>
       </nav>
       <div className="head">
         <div>
-          <h1 className="wide h1">{board.name}</h1>
+          <h1 className="title">{board.name}</h1>
           <p className="sub mute">{board.blurb}</p>
         </div>
         <Link className="btn solid" href={`${base}/new`}>New thread</Link>

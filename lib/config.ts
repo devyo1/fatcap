@@ -1,4 +1,5 @@
-export const CITY = process.env.NEXT_PUBLIC_CITY || 'Montreal';
+// Stored on each thread so city categories can be added later; the forum itself is global.
+export const CITY = process.env.NEXT_PUBLIC_CITY || 'global';
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://fatcap.club').replace(/\/$/, '');
 
 export const BOARDS = [

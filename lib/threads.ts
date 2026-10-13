@@ -1,9 +1,10 @@
 import 'server-only';
 import { q } from './db';
-import { CITY, PAGE_SIZE } from './config';
+import { PAGE_SIZE } from './config';
 import type { User } from './auth';
 import type { ThreadRow } from '@/components/ThreadRows';
 
+// $1 = member id, $2 = member joined at (threads older than that never count as unread)
 const COLUMNS = `
   t.id, t.title, t.board, u.username AS author, t.reply_count, t.last_post_at, t.created_at, t.pinned, t.locked,
   COALESCE(r.read_at < t.last_post_at, t.last_post_at > $2) AS unread,
@@ -22,10 +23,10 @@ export async function listThreads(me: User, opts: { board?: string; page?: numbe
   const page = Math.max(1, opts.page ?? 1);
   const rows = await q<ThreadRow>(
     `SELECT ${COLUMNS} ${FROM}
-      WHERE t.city = $3 AND NOT t.deleted AND ($4::text IS NULL OR t.board = $4)
+      WHERE NOT t.deleted AND ($3::text IS NULL OR t.board = $3)
       ORDER BY ${opts.board ? 't.pinned DESC,' : ''} t.last_post_at DESC
-      LIMIT $5 OFFSET $6`,
-    [me.id, me.created_at, CITY, opts.board ?? null, limit + 1, (page - 1) * limit],
+      LIMIT $4 OFFSET $5`,
+    [me.id, me.created_at, opts.board ?? null, limit + 1, (page - 1) * limit],
   );
   return { rows: rows.slice(0, limit), more: rows.length > limit, page };
 }
@@ -37,8 +38,8 @@ export async function trendingThreads(me: User, limit = 5) {
             (SELECT count(*) FROM posts p WHERE p.thread_id = t.id AND NOT p.deleted AND p.created_at > now() - interval '7 days')
           + (SELECT count(*) FROM props pr WHERE pr.target = 'thread' AND pr.target_id = t.id AND pr.created_at > now() - interval '7 days') AS heat
      ${FROM}
-      WHERE t.city = $3 AND NOT t.deleted AND t.last_post_at > now() - interval '7 days'
-      ORDER BY heat DESC, t.last_post_at DESC LIMIT $4`,
-    [me.id, me.created_at, CITY, limit],
+      WHERE NOT t.deleted AND t.last_post_at > now() - interval '7 days'
+      ORDER BY heat DESC, t.last_post_at DESC LIMIT $3`,
+    [me.id, me.created_at, limit],
   );
 }

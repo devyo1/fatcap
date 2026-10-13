@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { q, one } from '@/lib/db';
 import { requireUser, type User } from '@/lib/auth';
-import { CITY, LIMITS, boardBySlug } from '@/lib/config';
+import { LIMITS, boardBySlug } from '@/lib/config';
 import { ago } from '@/lib/format';
 import { reply, deletePost, deleteThread, editPost, editThread, toggleProps, setThreadFlag } from '@/app/actions';
 import RichText from '@/components/RichText';
@@ -159,7 +159,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
   return (
     <>
       <nav className="crumbs mono" aria-label="Breadcrumb">
-        <Link href="/forum">{CITY}</Link><span>/</span>
+        <Link href="/forum">Forum</Link><span>/</span>
         <Link href={`/forum/${thread.board}`}>{board?.name ?? thread.board}</Link>
       </nav>
       <div className="head">
@@ -168,7 +168,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
             {thread.pinned && <span className="pill on">Pinned</span>}
             {thread.locked && <span className="pill">Locked</span>}
           </div>
-          <h1 className="wide" style={{ fontSize: 'clamp(26px, 4.4vw, 46px)' }}>{thread.title}</h1>
+          <h1 className="title thread-title">{thread.title}</h1>
         </div>
         {me.is_admin && (
           <div className="actions">

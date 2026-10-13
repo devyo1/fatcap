@@ -70,7 +70,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
         <div className="who-head">
           <Avatar name={p.username} size={72} />
           <div>
-          <h1 className="wide h1" style={{ overflowWrap: 'anywhere' }}>{p.username}</h1>
+          <h1 className="title" style={{ overflowWrap: 'anywhere' }}>{p.username}</h1>
           <p className="sub mono mute">
             Joined {date(p.created_at)}{via ? <> / {via}</> : null}{p.last_seen_at ? <> / Seen {ago(p.last_seen_at)}</> : null}
           </p>

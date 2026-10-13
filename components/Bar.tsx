@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { logout } from '@/app/actions';
-import { CITY } from '@/lib/config';
 import type { User } from '@/lib/auth';
 import QuickNav from './QuickNav';
 
@@ -15,7 +14,6 @@ export default function Bar({ me, counts }: { me: User; counts: { messages: numb
       </div>
       <div className="wrap tabs-wrap">
         <nav className="tabs mono" aria-label="Sections">
-          <span className="br mute">{CITY}</span>
           <Link href="/forum">Forum</Link>
           <Link href="/members">Members</Link>
           <Link href="/search">Search</Link>

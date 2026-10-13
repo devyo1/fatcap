@@ -47,7 +47,7 @@ export default async function Conversation({ params, searchParams }: { params: P
         <Link href="/messages">Messages</Link><span>/</span><span>{other.username}</span>
       </nav>
       <div className="head">
-        <h1 className="wide h2"><Link href={`/u/${encodeURIComponent(other.username)}`}>{other.username}</Link></h1>
+        <h1 className="title"><Link href={`/u/${encodeURIComponent(other.username)}`}>{other.username}</Link></h1>
         <span className="mono mute">Private</span>
       </div>
 

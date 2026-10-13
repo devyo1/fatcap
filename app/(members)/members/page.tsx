@@ -19,7 +19,7 @@ export default async function Members() {
   return (
     <>
       <div className="head">
-        <h1 className="wide h1">Members</h1>
+        <h1 className="title">Members</h1>
         <span className="mono mute">{members.length}</span>
       </div>
       <ul className="rows">

@@ -24,7 +24,7 @@ export default async function Sheet({ params, searchParams }: { params: Promise<
     <>
       <div className="head no-print">
         <div>
-          <h1 className="wide h2">{batch}</h1>
+          <h1 className="title">{batch}</h1>
           <p className="sub mono mute">{shown.length} {all ? 'codes' : 'unused codes'} / each works once</p>
         </div>
         <div className="actions">

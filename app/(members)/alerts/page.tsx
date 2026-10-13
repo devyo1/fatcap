@@ -29,7 +29,7 @@ export default async function Alerts() {
 
   return (
     <>
-      <div className="head"><h1 className="wide h1">Alerts</h1></div>
+      <div className="head"><h1 className="title">Alerts</h1></div>
       {alerts.length ? (
         <ul className="rows">
           {alerts.map((a) => (

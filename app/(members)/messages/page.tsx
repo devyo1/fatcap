@@ -36,7 +36,7 @@ export default async function Messages() {
     <>
       <RefreshEvery seconds={20} />
       <div className="head">
-        <h1 className="wide h1">Messages</h1>
+        <h1 className="title">Messages</h1>
         <form action={startWith} className="newdm">
           <label className="sr" htmlFor="to">Message a member</label>
           <input className="input" id="to" name="to" placeholder="Username" autoComplete="off" autoCapitalize="none" spellCheck={false} required />
