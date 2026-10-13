@@ -18,10 +18,13 @@ They don't pile up: pictures in a thread's opening post last as long as the thre
 ## Forum
 
 - **Tree:** General, Travel, Lifestyle and Market, three sub-forums each, defined in `lib/config.ts` (rename or reorder there, no migration needed). New threads pick a sub-forum. Threads from before sub-forums existed show under their board's "All" until moved (admins: **Move** in the thread's menu; authors: **Edit**).
-- **Feed:** the forum home ranks threads by engagement (comments, likes, how many people joined in, pictures) over time since the last comment, with a lift for threads you haven't opened. **Recent** and **Top** (last 30 days) are one tap away; boards sort by Recent / New / Top.
+- **Feed:** the forum home ranks threads by engagement (comments, likes, how many people joined in, pictures) over time since the last comment, with a lift for threads you haven't opened. **Recent** and **Top** (last 30 days) are one tap away; boards sort by Recent / New / Top. Rows show the opening lines and the first picture. While a page is open, a pill appears when there are new threads (feed) or new comments (thread); tap it to load them.
+- **Tags:** `#anything` in a post becomes a link to every thread using it; the forum home lists the most used ones from the last 60 days.
 - **Vanishing threads:** a thread can delete itself after 24 hours, 7 days or 30 days, taking every comment, like, alert and picture with it.
 - **Follow / Save:** you follow threads you start or comment in, and get one alert per thread that updates as comments come in. Unfollow from the thread. Saved threads are private, under the avatar menu.
 - **Reports:** members report a thread or comment (spam, harassment, personal info, other); admins get an alert and work through them under Admin -> Reports.
+- **Block:** from a member's profile (the `...` menu). Their threads, comments and chat messages are hidden from you, they can't message you, deal with you or alert you, and you can't message them. Undo from the profile or Settings -> Blocked.
+- **Profile pictures:** Settings -> Picture. Cropped square and re-encoded, with location and camera data removed. **Use generated** goes back to the pixel mark.
 - Also: quote (select text first to quote part of a post), @mention suggestions while typing, collapsible reply trees, a full-screen image viewer, "new since your last visit" markers.
 - **Writing:** opening posts take up to 40,000 characters (comments 10,000), the box grows as you write, and **Preview** shows the post as it will look. Formatting: `## heading`, `**bold**`, `*italic*`, `> quote`, `- list`, `1. list`, `---` section break, @mentions, links. Images land where the cursor is; text after an image on the same line becomes its caption.
 - **GIFs:** a GIF button on posts, comments, DMs and chat, searching GIPHY through our server: members' devices never contact GIPHY, and a picked GIF is downloaded, re-encoded and stored like any upload. Needs `GIPHY_API_KEY`.
@@ -33,6 +36,7 @@ Members sell and trade with each other; no money moves through the site. Everyth
 - **Listings** sell at a **fixed price** (optionally taking offers too), by **offers**, or by **auction**, with stock for things like a zine run, shipping and/or meetup (an area, never an address), and "open to trades". **Wanted** posts carry a budget instead.
 - **Deals:** buying, an accepted offer, or winning an auction opens a deal. Shipped: buyer marks paid, seller confirms, seller marks shipped, buyer marks received. Meetup: buyer marks paid, seller confirms. Either side can cancel early (the seller with a reason). Both leave feedback at the end.
 - **Market dashboard** (avatar menu -> Market): what's waiting on you, offers to answer, deals in progress, your listings and stock, your offers and bids, history. Each profile shows the member's record (deals, good/bad feedback, unpaid wins), what they're selling, and recent feedback.
+- **Open deals** sit at the top of every Market page while you have any: each one with its next step (or who it's waiting on), offers to answer, and a count on **Your market**.
 - **Auctions** can't check anyone's funds, so they run on track record: bids are binding, a bid in the last 2 minutes adds 2 minutes, sellers can require bidders to have 1+, 3+ or 5+ completed deals, a winner who doesn't pay gets an "unpaid" mark, and the seller can offer the item to the next bidder. Bidders stay anonymous to each other; the seller sees names.
 - **Zines** with sample pages (listed in Market / Zines with two or more pictures) open in a page-turning viewer: spreads on wide screens, single pages on phones, swipe, keys, full screen.
 
@@ -45,6 +49,8 @@ Members sell and trade with each other; no money moves through the site. Everyth
 ## Home-screen app
 
 The site ships a web app manifest, so "Add to Home Screen" on iPhone/Android gives a full-screen app that stays inside the site and opens on the forum. Pull down from the top of any page to refresh. If you added the shortcut before this existed, delete it and add it again.
+
+On phones a tab bar sits at the bottom: Forum, Chat, **+** (new thread or listing where you are, or jumps to the reply box in a thread or chat), Market (dot when something's waiting on you) and your profile. It tucks away while you type.
 
 ## Environment variables (Vercel → Settings → Environment Variables)
 
@@ -76,11 +82,7 @@ Uses `DATABASE_URL` (or `LOCAL_DB`). If the username exists, it resets the passw
 
 ## Mock content
 
-```bash
-node scripts/seed-mock.mjs
-```
-
-Adds six flagged mock members with threads, comments, likes and a few Market listings (with generated covers) so the forum doesn't look empty. Remove it all from Admin -> Overview -> Remove all mock content.
+Admin -> Overview -> **Add mock content** (or `node scripts/seed-mock.mjs` locally) adds flagged mock members (some with profile pictures) with threads in every sub-forum, comments, likes, and Market listings with generated covers and zine sample pages, offers, an auction and finished deals, so the forum doesn't look empty. Running it again only fills in what's missing. Mock members can't log in. Remove it all from Admin -> Overview -> Remove all mock content.
 
 ## Local development
 

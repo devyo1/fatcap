@@ -43,8 +43,9 @@ const ImageIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1" /><circle cx="9" cy="10" r="2" /><path d="M21 16l-5-5-9 9" /></svg>
 );
 
-export default function ChatRoom({ me, isAdmin, initial, reactions: firstReactions, wipeAt: firstWipe, max, emojis }: {
+export default function ChatRoom({ me, isAdmin, initial, reactions: firstReactions, wipeAt: firstWipe, max, emojis, hide = [] }: {
   me: string; isAdmin: boolean; initial: Msg[]; reactions: Reactions; wipeAt: string; max: number; emojis: string[];
+  hide?: string[]; // members you blocked: their messages don't show
 }) {
   const [msgs, setMsgs] = useState<Msg[]>(initial);
   const [reactions, setReactions] = useState<Reactions>(firstReactions);
@@ -63,6 +64,7 @@ export default function ChatRoom({ me, isAdmin, initial, reactions: firstReactio
   const fileRef = useRef<HTMLInputElement>(null);
   const stick = useRef(true);
   const lastId = msgs.length ? msgs[msgs.length - 1].id : 0;
+  const shown = hide.length ? msgs.filter((m) => !m.username || !hide.includes(m.username)) : msgs;
 
   const load = useCallback(async (full = false) => {
     try {
@@ -193,8 +195,8 @@ export default function ChatRoom({ me, isAdmin, initial, reactions: firstReactio
       </div>
 
       <div className="chat-list" ref={listRef} onScroll={onScroll} role="log" aria-live="polite" aria-label="Chat messages">
-        {msgs.length ? msgs.map((m, i) => {
-          const prev = msgs[i - 1];
+        {shown.length ? shown.map((m, i) => {
+          const prev = shown[i - 1];
           const grouped = !m.reply_to && prev && prev.username === m.username && new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_MS;
           const mine = m.username === me;
           const rx = reactions[m.id] ?? [];

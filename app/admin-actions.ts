@@ -70,12 +70,21 @@ export async function moderate(form: FormData) {
   go('moderation');
 }
 
+/** Add whatever mock content is missing (members, threads in every sub-forum, Market, deals, pictures). */
+export async function addMock() {
+  await requireAdmin();
+  const { seedMock } = await import('@/lib/mock-data.mjs');
+  const r = await seedMock((text, params) => q(text, params ?? []));
+  go('overview', `&ok=${encodeURIComponent(`Added ${r.threads} threads, ${r.listings} listings, ${r.comments} comments${r.members ? `, ${r.members} members` : ''}.${r.skipped.length ? ` Skipped names taken by real members: ${r.skipped.join(', ')}.` : ''}`)}`);
+}
+
 /** Delete every mock member and everything they posted. */
 export async function removeMock() {
   await requireAdmin();
   const mock = (await q<{ id: number }>('SELECT id FROM members WHERE is_mock')).map((r) => r.id);
   if (mock.length) {
     await q('DELETE FROM deals WHERE seller_id = ANY($1::int[]) OR buyer_id = ANY($1::int[])', [mock]);
+    await q('DELETE FROM media WHERE member_id = ANY($1::int[])', [mock]);
     const touched = await q<{ thread_id: number }>('DELETE FROM posts WHERE user_id = ANY($1::int[]) RETURNING thread_id', [mock]);
     await q('DELETE FROM threads WHERE user_id = ANY($1::int[])', [mock]);
     await q(`DELETE FROM props WHERE (target = 'post' AND target_id NOT IN (SELECT id FROM posts)) OR (target = 'thread' AND target_id NOT IN (SELECT id FROM threads))`);

@@ -12,6 +12,7 @@ import ListingGrid from '@/components/ListingGrid';
 import type { ThreadRow } from '@/components/ThreadRows';
 import { repLine } from '@/components/DealBox';
 import { reputation } from '@/lib/market';
+import { toggleBlock } from '@/app/social-actions';
 
 type Profile = {
   id: number; username: string; created_at: string; last_seen_at: string | null; is_admin: boolean; bio: string | null;
@@ -44,6 +45,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ name: 
   );
   if (!p) notFound();
   const own = p.id === me.id;
+  const blocked = !own && !!(await one('SELECT 1 FROM blocks WHERE blocker_id = $1 AND blocked_id = $2', [me.id, p.id]));
 
   const activity = await q<Activity>(
     `(SELECT 'thread' AS kind, t.id AS thread_id, t.title, t.board, NULL::int AS post_id, t.created_at AS at
@@ -102,10 +104,20 @@ export default async function ProfilePage({ params }: { params: Promise<{ name: 
         </div>
         <div className="actions">
           {p.is_admin && <span className="pill on">Admin</span>}
-          {!own && <Link className="btn solid" href={`/messages/${encodeURIComponent(p.username)}`}>Message</Link>}
+          {!own && !blocked && <Link className="btn solid" href={`/messages/${encodeURIComponent(p.username)}`}>Message</Link>}
+          {!own && (
+            <details className="menu">
+              <summary className="btn small" aria-label="More">&middot;&middot;&middot;</summary>
+              <form action={toggleBlock} className="menu-panel mono right">
+                <input type="hidden" name="name" value={p.username} />
+                <button type="submit" className={blocked ? '' : 'danger'}>{blocked ? 'Unblock' : 'Block'}</button>
+              </form>
+            </details>
+          )}
           {own && <Link className="btn" href="/settings">Edit profile</Link>}
         </div>
       </div>
+      {blocked && <p className="notice mono">You blocked {p.username}. Their posts are hidden from you and you can't message each other.</p>}
       {p.bio && <RichText text={p.bio} className="body bio" />}
       <div className="stats mono mute">
         <span><b>{p.threads}</b>Threads</span>

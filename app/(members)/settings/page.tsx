@@ -1,8 +1,10 @@
 import Link from 'next/link';
-import { one } from '@/lib/db';
+import { q, one } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { changePassword, saveProfile } from '@/app/actions';
 import Avatar from '@/components/Avatar';
+import AvatarUpload from '@/components/AvatarUpload';
+import { toggleBlock } from '@/app/social-actions';
 import Notice from '@/components/Notice';
 
 export const metadata = { title: 'Edit profile' };
@@ -10,7 +12,11 @@ export const metadata = { title: 'Edit profile' };
 export default async function Settings({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string }> }) {
   const me = await requireUser();
   const { error, saved } = await searchParams;
-  const row = await one<{ bio: string | null }>('SELECT bio FROM members WHERE id = $1', [me.id]);
+  const [row, pic, blocked] = await Promise.all([
+    one<{ bio: string | null }>('SELECT bio FROM members WHERE id = $1', [me.id]),
+    one('SELECT 1 FROM avatars WHERE member_id = $1', [me.id]),
+    q<{ username: string }>('SELECT m.username FROM blocks b JOIN members m ON m.id = b.blocked_id WHERE b.blocker_id = $1 ORDER BY b.created_at DESC', [me.id]),
+  ]);
 
   return (
     <>
@@ -26,6 +32,11 @@ export default async function Settings({ searchParams }: { searchParams: Promise
       <Notice error={error} ok={saved === 'bio' ? 'Profile saved.' : saved === 'password' ? 'Password changed.' : undefined} />
 
       <div className="grid2" style={{ marginTop: 18 }}>
+        <section className="box">
+          <div className="bh mono"><span className="br">Picture</span></div>
+          <div className="bb"><AvatarUpload username={me.username} has={!!pic} /></div>
+        </section>
+
         <section className="box">
           <div className="bh mono"><span className="br">Profile</span></div>
           <div className="bb">
@@ -49,6 +60,21 @@ export default async function Settings({ searchParams }: { searchParams: Promise
               <div className="field"><label className="mono" htmlFor="confirm">New again</label><input className="input" id="confirm" name="confirm" type="password" autoComplete="new-password" required /></div>
               <div className="actions"><button className="btn" type="submit">Change password</button></div>
             </form>
+          </div>
+        </section>
+        <section className="box">
+          <div className="bh mono"><span className="br">Blocked</span><span className="mute">{blocked.length}</span></div>
+          <div className="bb">
+            {blocked.length ? (
+              <ul className="blocked-list">
+                {blocked.map((b) => (
+                  <li key={b.username}>
+                    <span><Avatar name={b.username} size={22} />{b.username}</span>
+                    <form action={toggleBlock}><input type="hidden" name="name" value={b.username} /><input type="hidden" name="back" value="/settings" /><button className="linkbtn mono mute" type="submit">Unblock</button></form>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="mono mute" style={{ margin: 0 }}>No one. Block someone from their profile.</p>}
           </div>
         </section>
       </div>

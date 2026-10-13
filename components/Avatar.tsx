@@ -1,5 +1,15 @@
-// Generated pixel avatar: a mirrored 5x5 grid seeded by the username, so everyone
-// gets a stable mark without uploading anything.
+'use client';
+
+import { createContext, useContext } from 'react';
+
+// Profile pictures: members who uploaded one get it (from the map the members layout provides,
+// username key -> version); everyone else gets a generated pixel mark seeded by their username.
+export const AvatarMap = createContext<Record<string, number>>({});
+
+export function AvatarProvider({ map, children }: { map: Record<string, number>; children: React.ReactNode }) {
+  return <AvatarMap.Provider value={map}>{children}</AvatarMap.Provider>;
+}
+
 const INKS = ['#E4E1D9', '#FF5FA2', '#FF5A1F', '#3D6BFF', '#CFCFCF'];
 
 function hash(s: string) {
@@ -9,7 +19,13 @@ function hash(s: string) {
 }
 
 export default function Avatar({ name, size = 28 }: { name: string | null; size?: number }) {
+  const map = useContext(AvatarMap);
   const key = (name ?? '?').toLowerCase();
+  const v = name ? map[key] : undefined;
+  if (v) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="avatar pic" src={`/api/avatar/${encodeURIComponent(key)}?v=${v}`} width={size} height={size} alt="" loading="lazy" decoding="async" />;
+  }
   let h = hash(key);
   const ink = INKS[h % INKS.length];
   const cells: [number, number][] = [];

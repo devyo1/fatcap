@@ -210,6 +210,12 @@ async function afterStockChange(threadId: number) {
   await syncDisplay(threadId);
 }
 
+/** True if either member blocked the other. */
+async function blockedBetween(a: number, b: number | null) {
+  if (!b) return false;
+  return !!(await one('SELECT 1 FROM blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)', [a, b]));
+}
+
 const pickMethod = (v: string, allowed: Method[]): Method => (allowed.includes(v as Method) ? (v as Method) : allowed[0] ?? 'meetup');
 
 /** Buy at the listed price. It's a commitment: the deal opens straight away and the seller is told. */
@@ -222,6 +228,7 @@ export async function buy(form: FormData) {
   const { t, l } = found!;
   if (l.mode !== 'fixed' || !l.price_cents) fail(path, 'Not for sale at a fixed price.');
   if (l.seller_id === me.id) fail(path, "That's your listing.");
+  if (await blockedBetween(me.id, l.seller_id)) fail(path, "You can't deal with this member.");
   const st = await one<{ status: string | null }>('SELECT status FROM threads WHERE id = $1', [id]);
   if (st?.status === 'closed') fail(path, 'This listing is closed.');
   const qty = int(form.get('quantity'), 1, 999, 1);
@@ -246,6 +253,7 @@ export async function makeOffer(form: FormData) {
   const { l } = found!;
   if (!(l.mode === 'offers' || (l.mode === 'fixed' && l.accept_offers))) fail(path, 'Not taking offers.');
   if (l.seller_id === me.id) fail(path, "That's your listing.");
+  if (await blockedBetween(me.id, l.seller_id)) fail(path, "You can't deal with this member.");
   if (available(l) <= 0) fail(path, 'Sold out.');
   const amount = toCents(str(form.get('amount')));
   const note = str(form.get('note')).trim().slice(0, 300) || null;
@@ -308,6 +316,7 @@ export async function placeBid(form: FormData) {
   const { l } = found!;
   if (!auctionOpen(l)) fail(path, 'This auction has ended.');
   if (l.seller_id === me.id) fail(path, "You can't bid on your own auction.");
+  if (await blockedBetween(me.id, l.seller_id)) fail(path, "You can't deal with this member.");
   if (l.min_deals > 0) {
     const rep = await reputation(me.id);
     if (rep.sold + rep.bought < l.min_deals) fail(path, `Bidding here needs ${l.min_deals} completed ${l.min_deals === 1 ? 'deal' : 'deals'}.`);

@@ -23,6 +23,7 @@ export default async function Conversation({ params, searchParams }: { params: P
   const other = await one<{ id: number; username: string }>('SELECT id, username FROM members WHERE username_key = $1 AND NOT banned', [usernameKey(name)]);
   if (!other) notFound();
   if (other.id === me.id) redirect('/messages');
+  const cut = !!(await one('SELECT 1 FROM blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)', [me.id, other.id]));
   // Coming from a Market listing: start the message with a reference to it.
   const listing = about
     ? await one<{ id: number; title: string }>(`SELECT id, title FROM threads WHERE id = $1 AND status IS NOT NULL AND NOT deleted`, [Number(about) || 0])
@@ -67,6 +68,7 @@ export default async function Conversation({ params, searchParams }: { params: P
       </div>
 
       <Notice error={error} />
+      {cut ? <p className="notice mono">You can't message this member.</p> : (
       <form action={sendMessage} className="dm-compose">
         <input type="hidden" name="to" value={other.username} />
         <label className="sr" htmlFor="msg">Message {other.username}</label>
@@ -74,6 +76,7 @@ export default async function Conversation({ params, searchParams }: { params: P
           <button className="btn solid small" type="submit">Send</button>
         </Writer>
       </form>
+      )}
     </>
   );
 }

@@ -238,7 +238,7 @@ export default async function Market({ searchParams }: { searchParams: Promise<{
                 <li key={m.id} className="mk-row">
                   <Link className="inv-cover" href={`/forum/t/${m.id}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {m.cover ? <img src={mediaUrl(m.cover)} alt="" loading="lazy" /> : <span className="cover-blank" />}
+                    {m.cover ? <img src={`${mediaUrl(m.cover)}?w=240&sq=1`} alt="" loading="lazy" /> : <span className="cover-blank" />}
                   </Link>
                   <span className="mk-main">
                     <Link className="mk-title" href={`/forum/t/${m.id}`}>{m.title}</Link>

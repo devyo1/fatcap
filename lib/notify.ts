@@ -20,8 +20,9 @@ export async function notify(targets: { kind: NotifyKind; ids: (number | null | 
   if (!rows.length) return seen;
   await q(
     `INSERT INTO notifications (member_id, kind, actor_id, thread_id, post_id, chat_id, deal_id)
-     SELECT m, k, $3, $4, $5, $6, $7 FROM unnest($1::int[], $2::text[]) AS t(m, k)
-     WHERE EXISTS (SELECT 1 FROM members WHERE id = m AND NOT banned)`,
+     SELECT m, k, $3::int, $4, $5, $6, $7 FROM unnest($1::int[], $2::text[]) AS t(m, k)
+     WHERE EXISTS (SELECT 1 FROM members WHERE id = m AND NOT banned)
+       AND NOT EXISTS (SELECT 1 FROM blocks WHERE blocker_id = m AND blocked_id = $3::int)`,
     [rows.map((r) => r.member), rows.map((r) => r.kind), actorId || null, ref.threadId ?? null, ref.postId ?? null, ref.chatId ?? null, ref.dealId ?? null],
   );
   return seen;
@@ -37,6 +38,7 @@ export async function notifyFollowers(threadId: number, starterId: number | null
     `WITH f AS (
        SELECT tf.member_id FROM thread_follows tf JOIN members m ON m.id = tf.member_id
         WHERE tf.thread_id = $1 AND tf.following AND NOT m.banned AND NOT (tf.member_id = ANY($2::int[]))
+          AND NOT EXISTS (SELECT 1 FROM blocks WHERE blocker_id = tf.member_id AND blocked_id = $3)
      ), bumped AS (
        UPDATE notifications n SET actor_id = $3, post_id = $4, created_at = now(), count = n.count + 1
         WHERE n.thread_id = $1 AND n.kind IN ('follow', 'reply') AND n.read_at IS NULL AND n.member_id IN (SELECT member_id FROM f)
@@ -55,3 +57,4 @@ export async function idsForNames(names: string[]) {
   const rows = await q<{ id: number }>('SELECT id FROM members WHERE username_key = ANY($1::text[]) AND NOT banned', [names]);
   return rows.map((r) => r.id);
 }
+

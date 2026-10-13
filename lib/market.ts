@@ -152,13 +152,38 @@ export const CANCEL_REASONS = {
 export const canCancel = (status: DealStatus, role: 'buyer' | 'seller') =>
   role === 'buyer' ? status === 'agreed' : status !== 'complete' && status !== 'cancelled';
 
+const PENDING_OFFERS = `SELECT count(*) FROM offers o JOIN listings l ON l.thread_id = o.listing_id JOIN threads t ON t.id = o.listing_id
+  WHERE l.seller_id = $1 AND o.kind = 'offer' AND o.status = 'pending' AND NOT t.deleted`;
+
 /** Things waiting on this member: their turn in a deal, or offers on their listings. */
 export async function marketTodo(memberId: number) {
   const r = await one<{ n: number }>(
     `SELECT (SELECT count(*) FROM deals WHERE (buyer_id = $1 AND status IN ('agreed', 'sent')) OR (seller_id = $1 AND status IN ('paid', 'confirmed')))::int
-          + (SELECT count(*) FROM offers o JOIN listings l ON l.thread_id = o.listing_id JOIN threads t ON t.id = o.listing_id
-              WHERE l.seller_id = $1 AND o.kind = 'offer' AND o.status = 'pending' AND NOT t.deleted)::int AS n`,
+          + (${PENDING_OFFERS})::int AS n`,
     [memberId],
   );
   return r?.n ?? 0;
+}
+
+export type OpenDeal = { id: number; title: string; role: 'buyer' | 'seller'; other: string | null; next: string | null };
+
+/** A member's deals still in motion (the ones waiting on them first), and offers they haven't answered. */
+export async function openDeals(memberId: number) {
+  const [rows, offers] = await Promise.all([
+    q<{ id: number; title: string; method: Method; status: DealStatus; seller_id: number | null; seller: string | null; buyer: string | null }>(
+      `SELECT d.id, d.title, d.method, d.status, d.seller_id, s.username AS seller, b.username AS buyer
+         FROM deals d LEFT JOIN members s ON s.id = d.seller_id LEFT JOIN members b ON b.id = d.buyer_id
+        WHERE (d.seller_id = $1 OR d.buyer_id = $1) AND d.status NOT IN ('complete', 'cancelled')
+        ORDER BY d.updated_at DESC LIMIT 50`,
+      [memberId],
+    ),
+    one<{ n: number }>(`SELECT (${PENDING_OFFERS})::int AS n`, [memberId]),
+  ]);
+  const deals: OpenDeal[] = rows.map((d) => {
+    const role = d.seller_id === memberId ? 'seller' : 'buyer';
+    const step = STEPS[d.method][d.status];
+    return { id: d.id, title: d.title, role, other: role === 'seller' ? d.buyer : d.seller, next: step?.who === role ? step.label : null };
+  });
+  deals.sort((a, b) => Number(!!b.next) - Number(!!a.next));
+  return { deals, offers: offers?.n ?? 0 };
 }

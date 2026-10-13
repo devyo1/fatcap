@@ -296,6 +296,21 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS deals_seller_idx ON deals (seller_id, status)`,
   `CREATE INDEX IF NOT EXISTS deals_buyer_idx ON deals (buyer_id, status)`,
   `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS deal_id integer`,
+
+  // v10: blocking members, profile pictures.
+  `CREATE TABLE IF NOT EXISTS blocks (
+    blocker_id integer NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    blocked_id integer NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (blocker_id, blocked_id),
+    CHECK (blocker_id <> blocked_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS blocks_blocked_idx ON blocks (blocked_id)`,
+  `CREATE TABLE IF NOT EXISTS avatars (
+    member_id  integer PRIMARY KEY REFERENCES members(id) ON DELETE CASCADE,
+    data       bytea NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
 ];
 
 for (const s of statements) await exec(s);

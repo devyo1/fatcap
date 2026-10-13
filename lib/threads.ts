@@ -8,11 +8,15 @@ import type { ThreadRow } from '@/components/ThreadRows';
 /** A thread that's visible: not deleted, and not past its vanish time. */
 export const LIVE = `NOT t.deleted AND (t.expires_at IS NULL OR t.expires_at > now())`;
 
+/** Not by someone the viewer ($1) has blocked. */
+export const UNBLOCKED = `NOT EXISTS (SELECT 1 FROM blocks bl WHERE bl.blocker_id = $1 AND bl.blocked_id = t.user_id)`;
+
 // $1 = member id, $2 = member joined at (threads older than that never count as unread)
 const COLUMNS = `
   t.id, t.title, t.board, t.topic, u.username AS author, t.reply_count, t.last_post_at, t.created_at, t.pinned, t.locked,
   t.expires_at, t.price, t.status, lst.mode, CASE WHEN lst.mode = 'auction' AND NOT lst.settled THEN lst.ends_at END AS auction_ends,
   substring(t.body from '\\[img:([A-Za-z0-9_-]{16})\\]') AS cover,
+  left(regexp_replace(regexp_replace(t.body, '\\[img:[A-Za-z0-9_-]{16}\\][^\\n]*', '', 'g'), '\\s+', ' ', 'g'), 260) AS excerpt,
   COALESCE(r.read_at < t.last_post_at, t.last_post_at > $2) AS unread,
   (SELECT count(*)::int FROM props WHERE target = 'thread' AND target_id = t.id) AS props,
   (SELECT m.username FROM posts p JOIN members m ON m.id = p.user_id
@@ -50,7 +54,7 @@ export async function listThreads(me: User, opts: { board?: string; topic?: stri
   const sort = opts.sort ?? 'recent';
   const rows = await q<ThreadRow>(
     `SELECT ${COLUMNS} ${FROM}
-      WHERE ${LIVE} AND ($3::text IS NULL OR t.board = $3) AND ($6::text IS NULL OR t.topic = $6)
+      WHERE ${LIVE} AND ${UNBLOCKED} AND ($3::text IS NULL OR t.board = $3) AND ($6::text IS NULL OR t.topic = $6)
         ${sort === 'top' ? `AND t.created_at > now() - interval '30 days'` : ''}
       ORDER BY ${opts.board && sort === 'recent' ? 't.pinned DESC,' : ''} ${ORDER[sort]}
       LIMIT $4 OFFSET $5`,
@@ -68,7 +72,7 @@ export async function listThreads(me: User, opts: { board?: string; topic?: stri
 export async function feedThreads(me: User, limit = 25) {
   return q<ThreadRow>(
     `SELECT ${COLUMNS} ${FROM}
-      WHERE ${LIVE} AND t.last_post_at > now() - interval '120 days'
+      WHERE ${LIVE} AND ${UNBLOCKED} AND t.last_post_at > now() - interval '120 days'
       ORDER BY
         (1 + ${ENGAGEMENT} + CASE WHEN t.body ~ '\\[img:' THEN 2 ELSE 0 END)
         * CASE WHEN r.read_at IS NULL THEN 1.25 WHEN r.read_at < t.last_post_at THEN 1.1 ELSE 0.55 END
@@ -95,11 +99,22 @@ export async function topicStats(me: User, board?: string) {
        FROM threads t
        LEFT JOIN thread_reads r ON r.thread_id = t.id AND r.member_id = $1
        LEFT JOIN members u ON u.id = t.user_id
-      WHERE ${LIVE} AND ($3::text IS NULL OR t.board = $3)
+      WHERE ${LIVE} AND ${UNBLOCKED} AND ($3::text IS NULL OR t.board = $3)
       GROUP BY t.board, t.topic`,
     [me.id, me.created_at, board ?? null],
   );
   return new Map(rows.map((r) => [`${r.board}/${r.topic ?? ''}`, r]));
+}
+
+/** Most used #tags in the last two months of threads. */
+export async function popularTags(limit = 12) {
+  return q<{ tag: string; n: number }>(
+    `SELECT lower(m[2]) AS tag, count(DISTINCT t.id)::int AS n
+       FROM threads t, regexp_matches(t.body, '(^|[^A-Za-z0-9_&#/])#([A-Za-z][A-Za-z0-9_]{1,29})', 'g') AS m
+      WHERE ${LIVE} AND t.created_at > now() - interval '60 days'
+      GROUP BY 1 ORDER BY n DESC, tag LIMIT $1`,
+    [limit],
+  );
 }
 
 /** Threads `me` saved, newest save first. */
@@ -107,7 +122,7 @@ export async function savedThreads(me: User) {
   return q<ThreadRow>(
     `SELECT ${COLUMNS} ${FROM}
        JOIN thread_saves s ON s.thread_id = t.id AND s.member_id = $1
-      WHERE ${LIVE}
+      WHERE ${LIVE} AND ${UNBLOCKED}
       ORDER BY s.created_at DESC LIMIT 200`,
     [me.id, me.created_at],
   );

@@ -4,7 +4,7 @@ import { q, one } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { ago, date } from '@/lib/format';
 import { makeStickers, resetPassword, resolveReport } from '@/app/actions';
-import { banMember, unbanMember, toggleAdmin, wipeMemberPosts, moderate, removeMock } from '@/app/admin-actions';
+import { banMember, unbanMember, toggleAdmin, wipeMemberPosts, moderate, removeMock, addMock } from '@/app/admin-actions';
 import Avatar from '@/components/Avatar';
 import Notice from '@/components/Notice';
 import RichText from '@/components/RichText';
@@ -76,8 +76,11 @@ async function Overview() {
       <div className="box" style={{ marginTop: 32 }}>
         <div className="bh mono"><span className="br">Mock content</span><span className="mute">{s?.mock ?? 0} mock members</span></div>
         <div className="bb">
-          <p style={{ marginTop: 0 }}>Fake members and posts used to make the forum look alive while testing. Removing them deletes those members, their threads (with every comment inside), and their comments elsewhere.</p>
-          <form action={removeMock}><button className="btn danger" type="submit" disabled={!s?.mock}>Remove all mock content</button></form>
+          <p style={{ marginTop: 0 }}>Fake members and posts that make the forum look alive: threads in every sub-forum, Market listings, deals and pictures. Adding only fills in what's missing. Removing deletes those members and everything they posted.</p>
+          <div className="actions">
+            <form action={addMock}><button className="btn" type="submit">Add mock content</button></form>
+            <form action={removeMock}><button className="btn danger" type="submit" disabled={!s?.mock}>Remove all mock content</button></form>
+          </div>
         </div>
       </div>
     </>

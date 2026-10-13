@@ -370,6 +370,7 @@ export async function sendMessage(form: FormData) {
   const path = `/messages/${encodeURIComponent(toName)}`;
   const to = await one<{ id: number }>('SELECT id FROM members WHERE username_key = $1 AND NOT banned', [usernameKey(toName)]);
   if (!to || to.id === me.id) redirect('/messages');
+  if (await one('SELECT 1 FROM blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)', [me.id, to!.id])) back(path, "You can't message this member.");
   if (!body) back(path, 'Write something.');
   if (body.length > LIMITS.message) back(path, `Too long (max ${LIMITS.message}).`);
 

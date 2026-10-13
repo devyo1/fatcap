@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { q } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { ago } from '@/lib/format';
+import { SortTabs } from '@/components/ForumNav';
 
 export const metadata = { title: 'Alerts' };
 
@@ -51,8 +52,20 @@ function href(a: Alert) {
   return '/forum';
 }
 
-export default async function Alerts() {
+const REPLIES = ['comment_reply', 'reply', 'follow', 'mention', 'chat_mention', 'chat_reply'];
+const MARKET = ['offer', 'offer_accepted', 'offer_declined', 'bought', 'bid', 'outbid', 'won', 'auction_ended', 'second_chance',
+  'deal_paid', 'deal_confirmed', 'deal_sent', 'deal_complete', 'deal_cancelled'];
+
+/** "Today", "Yesterday", "This week", "Earlier", in Montreal time (the club's clock, same as the chat wipe). */
+const dayOf = (x: Date) => Date.parse(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto' }).format(x));
+function bucket(iso: string) {
+  const diff = Math.round((dayOf(new Date()) - dayOf(new Date(iso))) / 864e5);
+  return diff <= 0 ? 'Today' : diff === 1 ? 'Yesterday' : diff < 7 ? 'This week' : 'Earlier';
+}
+
+export default async function Alerts({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
   const me = await requireUser();
+  const show = (await searchParams).show === 'replies' ? 'replies' : (await searchParams).show === 'market' ? 'market' : 'all';
   const alerts = await q<Alert>(
     `SELECT n.id, n.kind, n.count, a.username AS actor, n.thread_id, n.post_id, n.chat_id, n.deal_id,
             COALESCE(t.title, d.title) AS title, n.read_at, n.created_at
@@ -61,8 +74,9 @@ export default async function Alerts() {
        LEFT JOIN threads t ON t.id = n.thread_id
        LEFT JOIN deals d ON d.id = n.deal_id
       WHERE n.member_id = $1 AND (t.id IS NULL OR (NOT t.deleted AND (t.expires_at IS NULL OR t.expires_at > now())))
-      ORDER BY n.created_at DESC LIMIT 60`,
-    [me.id],
+        AND ($2::text[] IS NULL OR n.kind = ANY($2::text[]))
+      ORDER BY n.created_at DESC LIMIT 80`,
+    [me.id, show === 'replies' ? REPLIES : show === 'market' ? MARKET : null],
   );
   // Opening this page counts as reading them; the unread ones still show highlighted this once.
   await q('UPDATE notifications SET read_at = now() WHERE member_id = $1 AND read_at IS NULL', [me.id]);
@@ -70,10 +84,16 @@ export default async function Alerts() {
   return (
     <>
       <div className="page-head"><h1 className="title">Alerts</h1></div>
+      <SortTabs label="Show" current={show} items={[
+        { id: 'all', name: 'All', href: '/alerts' },
+        { id: 'replies', name: 'Replies', href: '/alerts?show=replies' },
+        { id: 'market', name: 'Market', href: '/alerts?show=market' },
+      ]} />
       {alerts.length ? (
-        <ul className="rows">
-          {alerts.map((a) => (
+        <ul className="rows alert-rows">
+          {alerts.map((a, i) => (
             <li key={a.id}>
+              {(i === 0 || bucket(alerts[i - 1].created_at) !== bucket(a.created_at)) && <span className="day mono mute">{bucket(a.created_at)}</span>}
               <Link className={`row${a.read_at ? '' : ' unread'}`} href={href(a)}>
                 <span className="t alert">
                   {!a.read_at && <span className="new" aria-label="New" />}

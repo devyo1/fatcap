@@ -22,7 +22,7 @@ const nextConfig = {
       },
       {
         // Pages can't be framed. Image and sticker routes set a stricter policy of their own (sandboxed).
-        source: '/((?!api/media|api/chat/img|api/sticker).*)',
+        source: '/((?!api/media|api/chat/img|api/sticker|api/avatar|api/gif).*)',
         headers: [{ key: 'Content-Security-Policy', value: "frame-ancestors 'none'" }],
       },
     ];

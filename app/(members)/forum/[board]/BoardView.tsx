@@ -3,8 +3,10 @@ import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
 import { boardBySlug, subBySlug, type Sub } from '@/lib/config';
 import { listThreads, topicStats, sortOf, SORTS } from '@/lib/threads';
+import { openDeals } from '@/lib/market';
 import ThreadRows from '@/components/ThreadRows';
 import ListingGrid from '@/components/ListingGrid';
+import OpenDeals from '@/components/OpenDeals';
 import { SortTabs, SubForums } from '@/components/ForumNav';
 
 /**
@@ -19,10 +21,12 @@ export default async function BoardView({ boardSlug, subSlug, page: pageParam, s
   if (subSlug && !sub) notFound();
   const sort = sortOf(sortParam);
 
-  const [{ rows, more, page }, stats] = await Promise.all([
+  const [{ rows, more, page }, stats, open] = await Promise.all([
     listThreads(me, { board: board.slug, topic: sub?.slug, sort, page: Number(pageParam) || 1, limit: board.market ? 24 : undefined }),
     topicStats(me, board.slug),
+    board.market ? openDeals(me.id) : null,
   ]);
+  const waiting = open ? open.deals.filter((d) => d.next).length + open.offers : 0;
   const base = sub ? `/forum/${board.slug}/${sub.slug}` : `/forum/${board.slug}`;
   const at = (o: { sort?: string; page?: number }) => {
     const p = new URLSearchParams();
@@ -45,8 +49,12 @@ export default async function BoardView({ boardSlug, subSlug, page: pageParam, s
           <h1 className="title">{sub?.name ?? board.name}</h1>
           <p className="mono mute stat-line">{sub?.blurb ?? board.blurb}</p>
         </div>
-        <Link className="btn solid" href={`/forum/${board.slug}/new${sub ? `?in=${sub.slug}` : ''}`}>{board.market ? 'New listing' : 'New thread'}</Link>
+        <div className="actions">
+          {board.market && <Link className="btn" href="/market">Your market{waiting > 0 && <span className="count">{waiting}</span>}</Link>}
+          <Link className="btn solid hide-phone" href={`/forum/${board.slug}/new${sub ? `?in=${sub.slug}` : ''}`}>{board.market ? 'New listing' : 'New thread'}</Link>
+        </div>
       </div>
+      {open && <OpenDeals deals={open.deals} offers={open.offers} />}
 
       {sub ? (
         <nav className="subcats mono" aria-label={`${board.name} sub-forums`}>

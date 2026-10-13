@@ -6,10 +6,10 @@ import { MEDIA_LINE, mediaUrl } from '@/lib/media-token';
 //   Blocks: blank line = new paragraph, "> " quote, "## " heading, "---" section break,
 //           "- " / "1. " lists, and a line reading [img:<id>] shows an uploaded image
 //           (side by side when several follow each other; text after it on the line is a caption).
-//   Inline: links, @name, **bold**, *italic*.
+//   Inline: links, @name, #tags, **bold**, *italic*.
 // Images hosted elsewhere stay plain links on purpose: embedding them would hand every reader's IP
 // address to whoever runs that server.
-const TOKEN = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]!?])|(^|[^A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_.-]{1,19}[A-Za-z0-9_])|\*\*([^*\n]+)\*\*|(^|[\s("'])\*([^*\s][^*\n]*?)\*(?=$|[\s).,!?;:"'])/g;
+const TOKEN = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]!?])|(^|[^A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_.-]{1,19}[A-Za-z0-9_])|\*\*([^*\n]+)\*\*|(^|[\s("'])\*([^*\s][^*\n]*?)\*(?=$|[\s).,!?;:"'])|(^|[^A-Za-z0-9_&#/])#([A-Za-z][A-Za-z0-9_]{1,29})(?![A-Za-z0-9_])/g;
 
 function inline(text: string, key: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -25,9 +25,12 @@ function inline(text: string, key: string): ReactNode[] {
     } else if (m[4]) {
       out.push(text.slice(last, at));
       out.push(<strong key={`${key}-${i++}`}>{m[4]}</strong>);
-    } else {
+    } else if (m[6] !== undefined) {
       out.push(text.slice(last, at) + m[5]);
       out.push(<em key={`${key}-${i++}`}>{m[6]}</em>);
+    } else {
+      out.push(text.slice(last, at) + m[7]);
+      out.push(<Link key={`${key}-${i++}`} className="tag" href={`/search?q=${encodeURIComponent(`#${m[8]}`)}`}>#{m[8]}</Link>);
     }
     last = at + m[0].length;
   }

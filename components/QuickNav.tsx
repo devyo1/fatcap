@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { logout } from '@/app/actions';
 import Avatar from './Avatar';
+import { NavSearch } from './Icons';
 import { haptic } from '@/lib/haptics';
 
 const Count = ({ n }: { n: number }) => (n > 0 ? <span className="count" aria-hidden="true">{n > 99 ? '99+' : n}</span> : null);
@@ -45,6 +46,7 @@ export default function QuickNav({ username, isAdmin, initial }: { username: str
       if (c.messages > prev.messages || c.alerts > prev.alerts || (c.market ?? 0) > (prev.market ?? 0)) { haptic([12, 60, 12]); setBump((b) => b + 1); }
       last.current = c;
       setCounts(c);
+      window.dispatchEvent(new CustomEvent('fc:counts', { detail: c })); // the phone tab bar listens
     }).catch(() => {});
     const first = setTimeout(load, 400); // let the page mark things read first
     const every = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 15000);
@@ -65,6 +67,7 @@ export default function QuickNav({ username, isAdmin, initial }: { username: str
   const profile = `/u/${encodeURIComponent(username)}`;
   return (
     <nav className="quick" aria-label="You">
+      <Link href="/search" className="icon-btn show-sm-flex" aria-label="Search" title="Search"><NavSearch /></Link>
       <Link href="/messages" className="icon-btn" aria-label={`Messages${counts.messages ? `, ${counts.messages} unread` : ''}`} title="Messages">
         <MsgIcon /><Count key={`m${bump}`} n={counts.messages} />
       </Link>
@@ -83,6 +86,7 @@ export default function QuickNav({ username, isAdmin, initial }: { username: str
             <Link role="menuitem" href="/settings">Edit profile</Link>
             <Link role="menuitem" href="/market" className="dd-market">Market{counts.market ? <span className="count">{counts.market}</span> : null}</Link>
             <Link role="menuitem" href="/saved">Saved</Link>
+            <Link role="menuitem" href="/invite">Invite</Link>
             <Link role="menuitem" href="/messages">Messages</Link>
             <Link role="menuitem" href="/alerts">Alerts</Link>
             {isAdmin && <Link role="menuitem" href="/admin">Admin</Link>}

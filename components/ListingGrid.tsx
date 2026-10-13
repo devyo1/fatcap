@@ -18,7 +18,7 @@ export default function ListingGrid({ rows, empty, showTopic = false }: { rows: 
               <span className="cover">
                 {t.cover
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={mediaUrl(t.cover)} alt="" loading="lazy" decoding="async" />
+                  ? <img src={`${mediaUrl(t.cover)}?w=480`} alt="" loading="lazy" decoding="async" />
                   : <span className="cover-blank" aria-hidden="true" />}
                 {tag && <span className={`cover-tag mono${sold ? '' : ' live'}`}>{tag}</span>}
               </span>

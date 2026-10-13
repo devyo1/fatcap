@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { ago, left } from '@/lib/format';
 import { placeName, subBySlug } from '@/lib/config';
 import Avatar from './Avatar';
-import { Hourglass, ImageIcon, Pin, Lock, Heart, Gavel } from './Icons';
+import { mediaUrl } from '@/lib/media-token';
+import { Hourglass, Pin, Lock, Heart, Gavel, Bubble } from './Icons';
 
 export type ThreadRow = {
   id: number;
@@ -24,7 +25,12 @@ export type ThreadRow = {
   cover?: string | null;
   mode?: string | null;
   auction_ends?: string | null;
+  excerpt?: string | null;
 };
+
+/** First words of a post for a list: markdown marks and links trimmed. */
+export const preview = (s: string | null | undefined) =>
+  (s ?? '').replace(/https?:\/\/\S+/g, '').replace(/(^|\s)(#{1,3}|>|-{3,}|[-*] |\d{1,2}[.)] )/g, ' ').replace(/\*\*?/g, '').replace(/\s+/g, ' ').trim();
 
 /** Little markers shared by rows and listing cards: pinned, locked, vanishing, has pictures. */
 export function Marks({ t }: { t: ThreadRow }) {
@@ -34,8 +40,8 @@ export function Marks({ t }: { t: ThreadRow }) {
       {t.locked && <span className="mark" title="Locked"><Lock /></span>}
       {t.auction_ends && <span className="mark auction" title="Auction, time left"><Gavel />{left(t.auction_ends)}</span>}
       {t.expires_at && <span className="mark vanish" title="Deletes itself"><Hourglass />{left(t.expires_at)}</span>}
-      {t.cover && <span className="mark" title="Images"><ImageIcon /></span>}
       {t.props ? <span className="mark" title={`${t.props} ${t.props === 1 ? 'like' : 'likes'}`}><Heart />{t.props}</span> : null}
+      {typeof t.reply_count === 'number' && <span className="mark phone-only" title="Comments"><Bubble />{t.reply_count}</span>}
     </>
   );
 }
@@ -54,6 +60,7 @@ export default function ThreadRows({ rows, showBoard = false, showTopic = false,
                 {t.unread && <span className="new" aria-label="New activity" />}
                 {t.title}
               </span>
+              {preview(t.excerpt) && <span className="ex">{preview(t.excerpt)}</span>}
               <span className="m mono">
                 {showBoard && <span className="board-tag">{placeName(t.board, t.topic)}</span>}
                 {showTopic && t.topic && <span className="board-tag">{subBySlug(t.board, t.topic)?.name}</span>}
@@ -63,6 +70,12 @@ export default function ThreadRows({ rows, showBoard = false, showTopic = false,
                 <Marks t={t} />
               </span>
             </span>
+            {t.cover && (
+              <span className="thumb">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`${mediaUrl(t.cover)}?w=240&sq=1`} alt="" loading="lazy" decoding="async" />
+              </span>
+            )}
             <span className="stats-col mono">
               <b>{t.reply_count}</b>
               <span className="mute">{t.reply_count === 1 ? 'comment' : 'comments'}</span>

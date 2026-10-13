@@ -22,6 +22,8 @@ import DealBox, { type PendingOffer } from '@/components/DealBox';
 import ListingForm from '@/components/ListingForm';
 import ZineViewer, { type ZinePage } from '@/components/ZineViewer';
 import { RefreshEvery } from '@/components/Live';
+import Pulse from '@/components/Pulse';
+import ReadingBar from '@/components/ReadingBar';
 import { getListing, bidsFor, reputation, settleAuctions, auctionOpen, type Listing } from '@/lib/market';
 import { updateListing } from '@/app/market-actions';
 import { MEDIA_LINE, mediaIn, mediaUrl } from '@/lib/media-token';
@@ -97,8 +99,8 @@ function count(kids: Map<number, Post[]>, id: number): number {
   return (kids.get(id) ?? []).reduce((n, c) => n + 1 + count(kids, c.id), 0);
 }
 
-function Comment({ post, kids, depth, me, threadId, locked, since, mode }: {
-  post: Post; kids: Map<number, Post[]>; depth: number; me: User; threadId: number; locked: boolean; since: number | null; mode: Mode;
+function Comment({ post, kids, depth, me, threadId, locked, since, mode, blocked }: {
+  post: Post; kids: Map<number, Post[]>; depth: number; me: User; threadId: number; locked: boolean; since: number | null; mode: Mode; blocked: Set<number>;
 }) {
   const fresh = isFresh(post, me, since);
   const children = kids.get(post.id) ?? [];
@@ -109,14 +111,14 @@ function Comment({ post, kids, depth, me, threadId, locked, since, mode }: {
   const reporting = mode.report === `p${post.id}` && !own && !post.deleted;
   const nested = children.length > 0 && (
     <div className={depth < MAX_DEPTH ? 'kids' : 'kids flat'}>
-      {children.map((c) => <Comment key={c.id} post={c} kids={kids} depth={depth + 1} me={me} threadId={threadId} locked={locked} since={since} mode={mode} />)}
+      {children.map((c) => <Comment key={c.id} post={c} kids={kids} depth={depth + 1} me={me} threadId={threadId} locked={locked} since={since} mode={mode} blocked={blocked} />)}
     </div>
   );
 
-  if (post.deleted) {
+  if (post.deleted || (post.user_id && blocked.has(post.user_id))) {
     return (
       <div className="comment" id={`p${post.id}`}>
-        <p className="gone mono">Deleted</p>
+        <p className="gone mono">{post.deleted ? 'Deleted' : 'Hidden: a member you blocked'}</p>
         {nested}
       </div>
     );
@@ -203,6 +205,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
       WHERE p.thread_id = $1 ORDER BY p.created_at LIMIT 1000`,
     [id, me.id],
   );
+  const blocked = new Set((await q<{ id: number }>('SELECT blocked_id AS id FROM blocks WHERE blocker_id = $1', [me.id])).map((b) => b.id));
   // When you last had this thread open, so comments since then can be marked (first visit: nothing is marked).
   const seen = await one<{ read_at: string }>('SELECT read_at FROM thread_reads WHERE member_id = $1 AND thread_id = $2', [me.id, id]);
   const since = seen ? new Date(seen.read_at).getTime() : null;
@@ -341,6 +344,8 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
             <div className="field"><label className="mono" htmlFor="ev">Vanish</label><VanishPicker id="ev" editing current={thread.expires_at} /></div>
             <div className="actions"><button className="btn solid small" type="submit">Save</button><Link className="mono mute" href={here}>Cancel</Link></div>
           </form>
+        ) : thread.user_id && blocked.has(thread.user_id) ? (
+          <details className="blocked-post"><summary className="mono mute">Posted by a member you blocked. Show anyway</summary><RichText text={text} /></details>
         ) : <RichText text={text} />}
 
         {!editing && (
@@ -388,6 +393,8 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
         )}
       </article>
 
+      <Pulse thread={thread.id} since={new Date().toISOString()} />
+      {readingMinutes(thread.body) >= 3 && <ReadingBar target="op" />}
       <section className="comments" aria-label="Comments">
         <div className="comments-head mono">
           <span className="br">{thread.reply_count} {thread.reply_count === 1 ? 'comment' : 'comments'}</span>
@@ -405,7 +412,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
           </form>
         )}
         {roots.length ? (
-          roots.map((p) => <Comment key={p.id} post={p} kids={kids} depth={1} me={me} threadId={thread.id} locked={locked} since={since} mode={mode} />)
+          roots.map((p) => <Comment key={p.id} post={p} kids={kids} depth={1} me={me} threadId={thread.id} locked={locked} since={since} mode={mode} blocked={blocked} />)
         ) : (
           <p className="empty mono">No comments.</p>
         )}
