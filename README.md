@@ -15,6 +15,7 @@ Landing page plus an invite-only members forum. Next.js on Vercel, Postgres on N
 | `DATABASE_URL` | Neon connection string (pooled). The only one you need. |
 | `SETUP_TOKEN` | Optional. Any long random string, used once at `/setup` to create the first admin. |
 | `NEXT_PUBLIC_CITY` | Optional tag stored on new threads (default `global`), kept for future city categories. |
+| `CHAT_WIPE_HOURS` | Optional. How often the live chat wipes itself (default `24`, resets around 1am Montreal time). |
 | `NEXT_PUBLIC_SITE_URL` | Optional. Defaults to `https://fatcap.club` (QR codes point here). |
 
 Tables are created automatically on every build (`scripts/migrate.mjs`, safe to re-run).

@@ -130,6 +130,15 @@ const statements = [
   `ALTER TABLE members ADD COLUMN IF NOT EXISTS ban_reason text`,
   `ALTER TABLE members ADD COLUMN IF NOT EXISTS banned_at timestamptz`,
   `ALTER TABLE members ADD COLUMN IF NOT EXISTS is_mock boolean NOT NULL DEFAULT false`,
+
+  // v4: live group chat (wiped on a schedule, see lib/chat.ts)
+  `CREATE TABLE IF NOT EXISTS chat_messages (
+    id         serial PRIMARY KEY,
+    member_id  integer REFERENCES members(id) ON DELETE CASCADE,
+    body       text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS chat_messages_created_idx ON chat_messages (created_at)`,
 ];
 
 for (const s of statements) await exec(s);

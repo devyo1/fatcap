@@ -15,6 +15,7 @@ export default function Bar({ me, counts }: { me: User; counts: { messages: numb
       <div className="wrap tabs-wrap">
         <nav className="tabs mono" aria-label="Sections">
           <Link href="/forum">Forum</Link>
+          <Link href="/chat" className="chat-tab"><span className="live-dot" aria-hidden="true" />Chat</Link>
           <Link href="/members">Members</Link>
           <Link href="/search">Search</Link>
           {me.is_admin && <Link href="/admin">Admin</Link>}
