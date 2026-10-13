@@ -5,13 +5,12 @@ import { requireUser, usernameKey } from '@/lib/auth';
 import { memberInvite, inviteUrl, qrSvg } from '@/lib/invites';
 import { ago, date } from '@/lib/format';
 import { boardBySlug } from '@/lib/config';
-import { changePassword } from '@/app/actions';
 import { CopyButton } from '@/components/Buttons';
-import Notice from '@/components/Notice';
 import Avatar from '@/components/Avatar';
+import RichText from '@/components/RichText';
 
 type Profile = {
-  id: number; username: string; created_at: string; last_seen_at: string | null; is_admin: boolean;
+  id: number; username: string; created_at: string; last_seen_at: string | null; is_admin: boolean; bio: string | null;
   via_kind: string | null; via_batch: string | null; inviter: string | null;
   threads: number; replies: number; invited: number; props: number;
 };
@@ -21,13 +20,12 @@ export async function generateMetadata({ params }: { params: Promise<{ name: str
   return { title: decodeURIComponent((await params).name) };
 }
 
-export default async function ProfilePage({ params, searchParams }: { params: Promise<{ name: string }>; searchParams: Promise<{ error?: string; saved?: string }> }) {
+export default async function ProfilePage({ params }: { params: Promise<{ name: string }> }) {
   const me = await requireUser();
   const name = decodeURIComponent((await params).name);
-  const { error, saved } = await searchParams;
 
   const p = await one<Profile>(
-    `SELECT u.id, u.username, u.created_at, u.last_seen_at, u.is_admin,
+    `SELECT u.id, u.username, u.created_at, u.last_seen_at, u.is_admin, u.bio,
             i.kind AS via_kind, i.batch AS via_batch, inv.username AS inviter,
             (SELECT count(*)::int FROM threads WHERE user_id = u.id AND NOT deleted) AS threads,
             (SELECT count(*)::int FROM posts WHERE user_id = u.id AND NOT deleted) AS replies,
@@ -79,8 +77,10 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
         <div className="actions">
           {p.is_admin && <span className="pill on">Admin</span>}
           {!own && <Link className="btn solid" href={`/messages/${encodeURIComponent(p.username)}`}>Message</Link>}
+          {own && <Link className="btn" href="/settings">Edit profile</Link>}
         </div>
       </div>
+      {p.bio && <RichText text={p.bio} className="body bio" />}
       <div className="stats mono mute">
         <span><b>{p.threads}</b>Threads</span>
         <span><b>{p.replies}</b>Comments</span>
@@ -123,19 +123,6 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-
-            <div className="box">
-              <div className="bh mono"><span className="br">Password</span></div>
-              <div className="bb">
-                <Notice error={error} ok={saved ? 'Password changed.' : undefined} />
-                <form action={changePassword} className="stack">
-                  <div className="field"><label className="mono" htmlFor="current">Current</label><input className="input" id="current" name="current" type="password" autoComplete="current-password" required /></div>
-                  <div className="field"><label className="mono" htmlFor="password">New</label><input className="input" id="password" name="password" type="password" autoComplete="new-password" required /></div>
-                  <div className="field"><label className="mono" htmlFor="confirm">New again</label><input className="input" id="confirm" name="confirm" type="password" autoComplete="new-password" required /></div>
-                  <div className="actions"><button className="btn" type="submit">Change password</button></div>
-                </form>
               </div>
             </div>
           </section>

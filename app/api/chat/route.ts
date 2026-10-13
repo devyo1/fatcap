@@ -1,43 +1,77 @@
 import { NextResponse } from 'next/server';
 import { currentUser } from '@/lib/auth';
 import { q, one } from '@/lib/db';
-import { chatMessages, chatWindow, wipeOld, CHAT_MAX } from '@/lib/chat';
+import { chatMessages, chatReactions, chatWindow, wipeOld, CHAT_MAX, CHAT_IMAGE_MAX } from '@/lib/chat';
+import { notify, idsForNames } from '@/lib/notify';
+import { mentionsIn } from '@/components/RichText';
 
 export const dynamic = 'force-dynamic';
 
-const unauthorized = () => NextResponse.json({ error: 'Log in first.' }, { status: 401 });
+const fail = (error: string, status = 400) => NextResponse.json({ error }, { status });
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-/** New messages since ?after=<id>, plus when the chat wipes next. */
+/** New messages since ?after=<id>, every reaction in the window, and when the chat wipes next. */
 export async function GET(req: Request) {
   const me = await currentUser();
-  if (!me) return unauthorized();
+  if (!me) return fail('Log in first.', 401);
   const after = Number(new URL(req.url).searchParams.get('after')) || 0;
-  const { start, wipeAt } = chatWindow();
-  return NextResponse.json({ messages: await chatMessages(after), windowStart: start.toISOString(), wipeAt: wipeAt.toISOString() });
+  const { wipeAt } = chatWindow();
+  const [messages, reactions] = await Promise.all([chatMessages(after), chatReactions()]);
+  return NextResponse.json({ messages, reactions, wipeAt: wipeAt.toISOString() });
 }
 
+/** Send a message: multipart form with body, optional image, optional reply_to. */
 export async function POST(req: Request) {
   const me = await currentUser();
-  if (!me) return unauthorized();
-  let body = '';
-  try { body = String((await req.json())?.body ?? '').trim(); } catch {}
-  if (!body) return NextResponse.json({ error: 'Write something.' }, { status: 400 });
-  if (body.length > CHAT_MAX) return NextResponse.json({ error: `Keep it under ${CHAT_MAX} characters.` }, { status: 400 });
+  if (!me) return fail('Log in first.', 401);
+  let form: FormData;
+  try { form = await req.formData(); } catch { return fail('Could not read that message.'); }
+  const body = String(form.get('body') ?? '').trim();
+  const file = form.get('image');
+  const replyTo = Number(form.get('reply_to')) || null;
+  const image = file instanceof File && file.size > 0 ? file : null;
+
+  if (!body && !image) return fail('Write something.');
+  if (body.length > CHAT_MAX) return fail(`Keep it under ${CHAT_MAX} characters.`);
+  if (image && !IMAGE_TYPES.includes(image.type)) return fail('Pictures only: JPG, PNG, WebP or GIF.');
+  if (image && image.size > CHAT_IMAGE_MAX) return fail('That picture is too big (3 MB max).');
 
   // One message per second per member keeps spam down.
-  const recent = await one('SELECT 1 FROM chat_messages WHERE member_id = $1 AND created_at > now() - interval \'1 second\'', [me.id]);
-  if (recent) return NextResponse.json({ error: 'Slow down a little.' }, { status: 429 });
+  if (await one(`SELECT 1 FROM chat_messages WHERE member_id = $1 AND created_at > now() - interval '1 second'`, [me.id])) {
+    return fail('Slow down a little.', 429);
+  }
 
   await wipeOld();
-  const row = await one<{ id: number }>('INSERT INTO chat_messages (member_id, body) VALUES ($1, $2) RETURNING id', [me.id, body]);
+  let imageId: number | null = null;
+  if (image) {
+    const hex = Buffer.from(await image.arrayBuffer()).toString('hex');
+    const row = await one<{ id: number }>(`INSERT INTO chat_images (member_id, mime, data) VALUES ($1, $2, decode($3, 'hex')) RETURNING id`, [me.id, image.type, hex]);
+    imageId = row?.id ?? null;
+  }
+  const parent = replyTo
+    ? await one<{ id: number; member_id: number | null }>('SELECT id, member_id FROM chat_messages WHERE id = $1 AND created_at >= $2', [replyTo, chatWindow().start])
+    : null;
+
+  const row = await one<{ id: number }>(
+    'INSERT INTO chat_messages (member_id, body, image_id, reply_to) VALUES ($1, $2, $3, $4) RETURNING id',
+    [me.id, body, imageId, parent?.id ?? null],
+  );
+  await notify(
+    [
+      { kind: 'chat_reply', ids: [parent?.member_id] },
+      { kind: 'chat_mention', ids: await idsForNames(mentionsIn(body)) },
+    ],
+    me.id, { chatId: row?.id },
+  );
   return NextResponse.json({ ok: true, id: row?.id });
 }
 
 /** Admins can remove a message: DELETE /api/chat?id=123 */
 export async function DELETE(req: Request) {
   const me = await currentUser();
-  if (!me?.is_admin) return unauthorized();
+  if (!me?.is_admin) return fail('Not allowed.', 403);
   const id = Number(new URL(req.url).searchParams.get('id'));
-  await q('DELETE FROM chat_messages WHERE id = $1', [id]);
+  const row = await one<{ image_id: number | null }>('DELETE FROM chat_messages WHERE id = $1 RETURNING image_id', [id]);
+  if (row?.image_id) await q('DELETE FROM chat_images WHERE id = $1', [row.image_id]);
   return NextResponse.json({ ok: true });
 }

@@ -139,6 +139,26 @@ const statements = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS chat_messages_created_idx ON chat_messages (created_at)`,
+
+  // v5: chat replies, pictures, reactions; chat alerts; profile bio
+  `CREATE TABLE IF NOT EXISTS chat_images (
+    id         serial PRIMARY KEY,
+    member_id  integer REFERENCES members(id) ON DELETE CASCADE,
+    mime       text NOT NULL,
+    data       bytea NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS reply_to integer REFERENCES chat_messages(id) ON DELETE SET NULL`,
+  `ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS image_id integer REFERENCES chat_images(id) ON DELETE SET NULL`,
+  `CREATE TABLE IF NOT EXISTS chat_reactions (
+    message_id integer NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+    member_id  integer NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    emoji      text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (message_id, member_id, emoji)
+  )`,
+  `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS chat_id integer`,
+  `ALTER TABLE members ADD COLUMN IF NOT EXISTS bio text`,
 ];
 
 for (const s of statements) await exec(s);

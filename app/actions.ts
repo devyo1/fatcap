@@ -109,7 +109,7 @@ export async function createThread(form: FormData) {
     'INSERT INTO threads (city, board, user_id, title, body) VALUES ($1, $2, $3, $4, $5) RETURNING id',
     [CITY, board!.slug, me.id, title, body],
   );
-  await notify([{ kind: 'mention', ids: await idsForNames(mentionsIn(body)) }], me.id, t!.id, null);
+  await notify([{ kind: 'mention', ids: await idsForNames(mentionsIn(body)) }], me.id, { threadId: t!.id });
   redirect(`/forum/t/${t!.id}`);
 }
 
@@ -150,7 +150,7 @@ export async function reply(form: FormData) {
       { kind: 'reply', ids: [thread!.user_id] },
       { kind: 'mention', ids: await idsForNames(mentionsIn(body)) },
     ],
-    me.id, threadId, p!.id,
+    me.id, { threadId, postId: p!.id },
   );
   redirect(`${path}#p${p!.id}`);
 }
@@ -261,14 +261,21 @@ export async function sendMessage(form: FormData) {
 
 export async function changePassword(form: FormData) {
   const me = await requireUser();
-  const path = `/u/${encodeURIComponent(me.username)}`;
+  const path = '/settings';
   const row = await one<{ password_hash: string }>('SELECT password_hash FROM members WHERE id = $1', [me.id]);
   if (!row || !(await checkPassword(str(form.get('current')), row.password_hash))) back(path, 'Current password is wrong.');
   const next = str(form.get('password'));
   const bad = checkNewPassword(next, str(form.get('confirm')));
   if (bad) back(path, bad);
   await q('UPDATE members SET password_hash = $1 WHERE id = $2', [await hashPassword(next), me.id]);
-  redirect(`${path}?saved=1`);
+  redirect(`${path}?saved=password`);
+}
+
+export async function saveProfile(form: FormData) {
+  const me = await requireUser();
+  const bio = str(form.get('bio')).trim().slice(0, 300) || null;
+  await q('UPDATE members SET bio = $1 WHERE id = $2', [bio, me.id]);
+  redirect('/settings?saved=bio');
 }
 
 /* ---------- admin ---------- */

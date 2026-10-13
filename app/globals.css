@@ -390,3 +390,58 @@ select.input option { background: var(--ink); color: var(--bone); }
   .cmsg-x { visibility: visible; }
 }
 @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+
+/* ---------- v6: header icons + profile menu ---------- */
+.bar .quick { display: flex; align-items: center; gap: 6px; }
+.icon-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; color: var(--body); border-radius: 50%; }
+.icon-btn:hover { color: var(--dot); background: rgba(228,225,217,.05); }
+.icon-btn .count { position: absolute; top: 3px; right: 1px; margin: 0; min-width: 17px; height: 17px; font-size: 9.5px; padding: 0 4px; border: 2px solid var(--ink); box-sizing: content-box; }
+.me-menu { position: relative; margin-left: 6px; }
+.me-btn { display: block; padding: 2px; border: 1px solid var(--line-2); background: none; cursor: pointer; border-radius: 0; }
+.me-btn:hover, .me-btn[aria-expanded="true"] { border-color: var(--dot); }
+.dropdown { position: absolute; right: 0; top: calc(100% + 8px); z-index: 50; min-width: 210px; background: var(--ink); border: 1px solid var(--line-2); box-shadow: 0 14px 40px rgba(0,0,0,.55); display: flex; flex-direction: column; padding: 6px 0; animation: drop .12s ease-out; }
+@keyframes drop { from { opacity: 0; transform: translateY(-4px); } }
+.bar .dropdown a, .bar .dropdown button { display: block; width: 100%; text-align: left; padding: 10px 16px; color: var(--body); background: none; border: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.bar .dropdown a:hover, .bar .dropdown button:hover, .bar .dropdown a:focus-visible, .bar .dropdown button:focus-visible { background: rgba(228,225,217,.05); color: var(--dot); outline: none; }
+.dd-head { display: flex; align-items: center; gap: 10px; padding: 8px 16px 12px; margin-bottom: 4px; border-bottom: 1px solid var(--line); color: var(--bone); font-weight: 700; text-transform: none; letter-spacing: 0; font-family: var(--sans); font-size: 15px; }
+.bio { margin: 16px 0 4px; color: var(--bone); }
+
+/* ---------- v6: chat replies, pictures, reactions ---------- */
+.chat-bar .wipes b { color: var(--bone); font-weight: 500; font-variant-numeric: tabular-nums; }
+.cmsg { grid-template-columns: 30px minmax(0, 1fr); }
+.cmsg-main { min-width: 0; }
+.cquote { display: block; margin: 2px 0 4px; padding: 3px 0 3px 10px; border-left: 2px solid var(--line-2); color: var(--mute); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.cquote b { color: var(--body); margin-right: 4px; }
+.cquote:hover { border-color: var(--dot); color: var(--body); }
+.cimg { display: block; margin: 4px 0 2px; max-width: min(100%, 320px); border: 1px solid var(--line-2); }
+.cimg img { display: block; width: 100%; height: auto; max-height: 360px; object-fit: contain; background: var(--ink-2); }
+.creacts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.creact { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 0 8px; border: 1px solid var(--line-2); background: rgba(228,225,217,.03); color: var(--body); border-radius: 13px; cursor: pointer; font-size: 13px; }
+.creact .mono { font-size: 11px; }
+.creact:hover { border-color: var(--bone); }
+.creact.on { border-color: var(--dot); background: rgba(228,225,217,.07); }
+.ctools { position: absolute; right: 10px; top: -12px; display: none; gap: 2px; background: var(--ink); border: 1px solid var(--line-2); padding: 2px; z-index: 3; }
+.cmsg:hover .ctools, .cmsg.open .ctools, .ctools:focus-within { display: flex; }
+.ctool { background: none; border: 0; color: var(--body); padding: 5px 8px; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.ctool:hover { color: var(--dot); }
+.ctool.danger:hover { color: #e0735f; }
+.cpicker { position: absolute; right: 0; top: calc(100% + 4px); display: flex; gap: 2px; background: var(--ink); border: 1px solid var(--line-2); padding: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.cpicker button { background: none; border: 0; font-size: 20px; width: 36px; height: 36px; cursor: pointer; border-radius: 50%; }
+.cpicker button:hover { background: rgba(228,225,217,.08); transform: scale(1.12); }
+.cmsg.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { 0%, 30% { background: rgba(228,225,217,.09); } }
+.cpending { border-top: 1px solid var(--line-2); padding: 8px 12px 0; display: flex; flex-direction: column; gap: 8px; }
+.cpend-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.cpend-row b { color: var(--bone); }
+.cthumb { height: 64px; width: auto; max-width: 140px; object-fit: cover; border: 1px solid var(--line-2); }
+.attach { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; background: none; border: 1px solid var(--line-2); color: var(--body); cursor: pointer; }
+.attach:hover { border-color: var(--dot); color: var(--dot); }
+.chat-err { margin: 8px 12px 10px; }
+@media (max-width: 640px) {
+  .ctools { top: auto; bottom: calc(100% - 6px); right: 8px; }
+  .cmsg:hover .ctools { display: none; }
+  .cmsg.open .ctools { display: flex; }
+  .cpicker { right: 0; }
+  .icon-btn { width: 36px; height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) { .dropdown, .cmsg.flash { animation: none; } }
