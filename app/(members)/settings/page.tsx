@@ -27,12 +27,12 @@ export default async function Settings({ searchParams }: { searchParams: Promise
 
       <div className="grid2" style={{ marginTop: 18 }}>
         <section className="box">
-          <div className="bh mono"><span className="br">About you</span></div>
+          <div className="bh mono"><span className="br">Profile</span></div>
           <div className="bb">
             <form action={saveProfile} className="stack">
               <div className="field">
                 <label className="mono" htmlFor="bio">Bio</label>
-                <textarea className="textarea" id="bio" name="bio" rows={4} maxLength={300} defaultValue={row?.bio ?? ''} placeholder="A line or two. Shows on your profile." />
+                <textarea className="textarea" id="bio" name="bio" rows={4} maxLength={300} defaultValue={row?.bio ?? ''} placeholder="Shown on your profile." />
                 <span className="hint mono">300 characters max. Links and @names work.</span>
               </div>
               <div className="actions"><button className="btn solid" type="submit">Save</button></div>

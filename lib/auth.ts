@@ -56,8 +56,8 @@ export async function endSession() {
   jar.delete(COOKIE);
 }
 
-/** The signed-in member, or null. */
-export async function currentUser(): Promise<User | null> {
+/** The signed-in member, or null. `touch: false` skips the last-seen update (for image requests and the like). */
+export async function currentUser({ touch = true } = {}): Promise<User | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const user = await one<User>(
@@ -66,7 +66,7 @@ export async function currentUser(): Promise<User | null> {
       WHERE s.token_hash = $1 AND s.expires_at > now() AND NOT u.banned`,
     [sha(token)],
   );
-  if (user) q('UPDATE members SET last_seen_at = now() WHERE id = $1', [user.id]).catch(() => {});
+  if (user && touch) q('UPDATE members SET last_seen_at = now() WHERE id = $1', [user.id]).catch(() => {});
   return user;
 }
 

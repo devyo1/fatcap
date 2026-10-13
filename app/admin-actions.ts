@@ -75,6 +75,7 @@ export async function removeMock() {
   await requireAdmin();
   const mock = (await q<{ id: number }>('SELECT id FROM members WHERE is_mock')).map((r) => r.id);
   if (mock.length) {
+    await q('DELETE FROM deals WHERE seller_id = ANY($1::int[]) OR buyer_id = ANY($1::int[])', [mock]);
     const touched = await q<{ thread_id: number }>('DELETE FROM posts WHERE user_id = ANY($1::int[]) RETURNING thread_id', [mock]);
     await q('DELETE FROM threads WHERE user_id = ANY($1::int[])', [mock]);
     await q(`DELETE FROM props WHERE (target = 'post' AND target_id NOT IN (SELECT id FROM posts)) OR (target = 'thread' AND target_id NOT IN (SELECT id FROM threads))`);

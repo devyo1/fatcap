@@ -1,6 +1,5 @@
 import 'server-only';
 import { randomInt } from 'node:crypto';
-import QRCode from 'qrcode';
 import { q, one } from './db';
 import { SITE_URL } from './config';
 
@@ -14,15 +13,6 @@ export function newCode(len = 10) {
 }
 
 export const inviteUrl = (code: string) => `${SITE_URL}/i/${code}`;
-
-export function qrSvg(text: string, opts: { dark?: string; light?: string } = {}) {
-  return QRCode.toString(text, {
-    type: 'svg',
-    errorCorrectionLevel: 'M',
-    margin: 1,
-    color: { dark: opts.dark ?? '#0E0E0D', light: opts.light ?? '#00000000' },
-  });
-}
 
 export type Invite = {
   id: number;

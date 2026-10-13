@@ -8,11 +8,13 @@ import {
   requireUser, requireAdmin, startSession, endSession, hashPassword, checkPassword,
   checkUsername, checkNewPassword, usernameKey,
 } from '@/lib/auth';
-import { CITY, LIMITS, boardBySlug } from '@/lib/config';
+import { CITY, LIMITS, REPORT_REASONS, parsePlace, vanishDays, isMarket } from '@/lib/config';
 import { createStickerBatch, memberInvite } from '@/lib/invites';
 import { str } from '@/lib/format';
-import { notify, idsForNames } from '@/lib/notify';
+import { notify, notifyFollowers, idsForNames } from '@/lib/notify';
 import { mentionsIn } from '@/components/RichText';
+import { dropMedia, pinThreadMedia } from '@/lib/media';
+import { LIVE } from '@/lib/threads';
 
 /** Only allow redirects back to our own pages. */
 const safeBack = (p: string) => (p.startsWith('/') && !p.startsWith('//') ? p : '/forum');
@@ -93,22 +95,39 @@ export async function setupAdmin(form: FormData) {
 
 /* ---------- forum ---------- */
 
+/** "", "never" or a number of days from the vanish picker -> the new expiry (undefined = leave as is). */
+function vanishFrom(v: string): Date | null | undefined {
+  if (v === 'never') return null;
+  const days = vanishDays(v);
+  return days ? new Date(Date.now() + days * 864e5) : undefined;
+}
+
+const follow = (memberId: number, threadId: number) =>
+  q('INSERT INTO thread_follows (member_id, thread_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [memberId, threadId]);
+
 export async function createThread(form: FormData) {
   const me = await requireUser();
-  const board = boardBySlug(str(form.get('board')));
-  if (!board) redirect('/forum');
+  const raw = str(form.get('place'));
+  const place = parsePlace(raw);
   const title = str(form.get('title')).trim();
   const body = str(form.get('body')).trim();
-  const path = `/forum/${board!.slug}/new`;
-  if (!title) back(path, 'Give it a title.');
-  if (!body) back(path, 'Write something.');
-  if (title.length > LIMITS.title) back(path, `Title is too long (max ${LIMITS.title}).`);
-  if (body.length > LIMITS.body) back(path, `Post is too long (max ${LIMITS.body}).`);
+  const price = str(form.get('price')).trim().slice(0, LIMITS.price) || null;
+  const path = `/forum/${raw.split('/')[0] || 'general'}/new`;
+  if (!place) back(path, 'Select a section.');
+  if (!title) back(path, 'Title required.');
+  if (!body) back(path, 'Post is empty.');
+  if (title.length > LIMITS.title) back(path, `Title too long (max ${LIMITS.title}).`);
+  if (body.length > LIMITS.body) back(path, `Post too long (max ${LIMITS.body}).`);
+  const expires = vanishFrom(str(form.get('vanish'))) ?? null;
+  const market = isMarket(place!.board);
 
   const t = await one<{ id: number }>(
-    'INSERT INTO threads (city, board, user_id, title, body) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-    [CITY, board!.slug, me.id, title, body],
+    `INSERT INTO threads (city, board, topic, user_id, title, body, expires_at, price, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+    [CITY, place!.board, place!.topic, me.id, title, body, expires, market ? price : null, market ? 'open' : null],
   );
+  await pinThreadMedia(t!.id, body, me.id, expires);
+  await follow(me.id, t!.id);
   await notify([{ kind: 'mention', ids: await idsForNames(mentionsIn(body)) }], me.id, { threadId: t!.id });
   redirect(`/forum/t/${t!.id}`);
 }
@@ -120,16 +139,18 @@ export async function reply(form: FormData) {
   const parentId = Number(form.get('parent')) || null;
   const body = str(form.get('body')).trim();
   const path = `/forum/t/${threadId}`;
-  const thread = await one<{ id: number; user_id: number | null; locked: boolean }>('SELECT id, user_id, locked FROM threads WHERE id = $1 AND NOT deleted', [threadId]);
+  const thread = await one<{ id: number; user_id: number | null; locked: boolean }>(
+    `SELECT id, user_id, locked FROM threads t WHERE id = $1 AND ${LIVE}`, [threadId],
+  );
   if (!thread) redirect('/forum');
-  if (thread!.locked && !me.is_admin) back(path, 'This thread is locked.');
-  if (!body) back(path, 'Write something.');
-  if (body.length > LIMITS.body) back(path, `Reply is too long (max ${LIMITS.body}).`);
+  if (thread!.locked && !me.is_admin) back(path, 'Thread is locked.');
+  if (!body) back(path, 'Comment is empty.');
+  if (body.length > LIMITS.comment) back(path, `Comment too long (max ${LIMITS.comment}).`);
 
   let parentAuthor: number | null = null;
   if (parentId) {
     const parent = await one<{ user_id: number | null }>('SELECT user_id FROM posts WHERE id = $1 AND thread_id = $2', [parentId, threadId]);
-    if (!parent) back(path, 'That comment is gone.');
+    if (!parent) back(path, 'Comment not found.');
     parentAuthor = parent!.user_id;
   }
 
@@ -143,15 +164,16 @@ export async function reply(form: FormData) {
      ON CONFLICT (member_id, thread_id) DO UPDATE SET read_at = now()`,
     [me.id, threadId],
   );
-  // Whoever wrote the comment being answered hears about it first, then the thread starter, then anyone @mentioned.
-  await notify(
+  await follow(me.id, threadId);
+  // The person being answered and anyone @mentioned hear first; then everyone following the thread.
+  const told = await notify(
     [
       { kind: 'comment_reply', ids: [parentAuthor] },
-      { kind: 'reply', ids: [thread!.user_id] },
       { kind: 'mention', ids: await idsForNames(mentionsIn(body)) },
     ],
     me.id, { threadId, postId: p!.id },
   );
+  await notifyFollowers(threadId, thread!.user_id, me.id, p!.id, told);
   redirect(`${path}#p${p!.id}`);
 }
 
@@ -161,12 +183,38 @@ export async function editThread(form: FormData) {
   const title = str(form.get('title')).trim();
   const body = str(form.get('body')).trim();
   const path = `/forum/t/${id}`;
-  const t = await one<{ user_id: number }>('SELECT user_id FROM threads WHERE id = $1 AND NOT deleted', [id]);
+  const t = await one<{ user_id: number; board: string; expires_at: string | null }>(`SELECT user_id, board, expires_at FROM threads t WHERE id = $1 AND ${LIVE}`, [id]);
   if (!t || t.user_id !== me.id) redirect('/forum');
-  if (!title || !body) back(path, "Title and post can't be empty.");
+  if (!title || !body) back(path, 'Title and post are required.');
   if (title.length > LIMITS.title || body.length > LIMITS.body) back(path, 'Too long.');
-  await q('UPDATE threads SET title = $1, body = $2, edited_at = now() WHERE id = $3', [title, body, id]);
+  const place = parsePlace(str(form.get('place')));
+  const vanish = vanishFrom(str(form.get('vanish')));
+  const expires = vanish === undefined ? t!.expires_at : vanish;
+  const market = isMarket(place?.board ?? t!.board);
+  const price = str(form.get('price')).trim().slice(0, LIMITS.price) || null;
+  await q(
+    `UPDATE threads SET title = $1, body = $2, edited_at = now(),
+            board = COALESCE($4, board), topic = CASE WHEN $4::text IS NULL THEN topic ELSE $5 END,
+            expires_at = $6, price = CASE WHEN $7 THEN $8 ELSE price END
+      WHERE id = $3`,
+    [title, body, id, place?.board ?? null, place?.topic ?? null, expires, market, price],
+  );
+  await pinThreadMedia(id, body, me.id, expires);
   redirect(path);
+}
+
+/** Admins can move any thread to another section. */
+export async function moveThread(form: FormData) {
+  await requireAdmin();
+  const id = Number(form.get('id'));
+  const place = parsePlace(str(form.get('place')));
+  if (place) {
+    await q(
+      `UPDATE threads SET board = $1, topic = $2, status = CASE WHEN $4 THEN COALESCE(status, 'open') ELSE NULL END WHERE id = $3`,
+      [place.board, place.topic, id, isMarket(place.board)],
+    );
+  }
+  redirect(`/forum/t/${id}`);
 }
 
 export async function editPost(form: FormData) {
@@ -176,8 +224,8 @@ export async function editPost(form: FormData) {
   const p = await one<{ user_id: number; thread_id: number }>('SELECT user_id, thread_id FROM posts WHERE id = $1 AND NOT deleted', [id]);
   if (!p || p.user_id !== me.id) redirect('/forum');
   const path = `/forum/t/${p!.thread_id}`;
-  if (!body) back(path, "A comment can't be empty. Delete it instead.");
-  if (body.length > LIMITS.body) back(path, 'Too long.');
+  if (!body) back(path, 'Comment is empty. Delete it instead.');
+  if (body.length > LIMITS.comment) back(path, 'Too long.');
   await q('UPDATE posts SET body = $1, edited_at = now() WHERE id = $2', [body, id]);
   redirect(`${path}#p${id}`);
 }
@@ -185,18 +233,22 @@ export async function editPost(form: FormData) {
 export async function deleteThread(form: FormData) {
   const me = await requireUser();
   const id = Number(form.get('id'));
-  const t = await one<{ user_id: number; board: string }>('SELECT user_id, board FROM threads WHERE id = $1', [id]);
+  const t = await one<{ user_id: number; board: string; body: string }>('SELECT user_id, board, body FROM threads WHERE id = $1', [id]);
   if (!t || (t.user_id !== me.id && !me.is_admin)) redirect('/forum');
   await q('UPDATE threads SET deleted = true WHERE id = $1', [id]);
+  // The thread is gone for everyone, so its images (and the ones in its comments) go too.
+  await q('DELETE FROM media WHERE thread_id = $1', [id]);
+  await dropMedia([t!, ...(await q<{ body: string; user_id: number | null }>('SELECT body, user_id FROM posts WHERE thread_id = $1', [id]))]);
   redirect(`/forum/${t!.board}`);
 }
 
 export async function deletePost(form: FormData) {
   const me = await requireUser();
   const id = Number(form.get('id'));
-  const p = await one<{ user_id: number; thread_id: number }>('SELECT user_id, thread_id FROM posts WHERE id = $1 AND NOT deleted', [id]);
+  const p = await one<{ user_id: number; thread_id: number; body: string }>('SELECT user_id, thread_id, body FROM posts WHERE id = $1 AND NOT deleted', [id]);
   if (!p || (p.user_id !== me.id && !me.is_admin)) redirect('/forum');
   await q('UPDATE posts SET deleted = true WHERE id = $1', [id]);
+  await dropMedia([p!]);
   await q('UPDATE threads SET reply_count = GREATEST(reply_count - 1, 0) WHERE id = $1', [p!.thread_id]);
   redirect(`/forum/t/${p!.thread_id}#p${id}`);
 }
@@ -211,6 +263,38 @@ export async function toggleProps(form: FormData) {
   redirect(safeBack(str(form.get('back'))));
 }
 
+/** Follow / unfollow a thread (alerts for new comments). Unfollowing sticks, even if you comment again. */
+export async function toggleFollow(form: FormData) {
+  const me = await requireUser();
+  const id = Number(form.get('id'));
+  await q(
+    `INSERT INTO thread_follows (member_id, thread_id, following) VALUES ($1, $2, true)
+     ON CONFLICT (member_id, thread_id) DO UPDATE SET following = NOT thread_follows.following`,
+    [me.id, id],
+  );
+  redirect(`/forum/t/${id}`);
+}
+
+export async function toggleSave(form: FormData) {
+  const me = await requireUser();
+  const id = Number(form.get('id'));
+  const removed = await q('DELETE FROM thread_saves WHERE member_id = $1 AND thread_id = $2 RETURNING 1', [me.id, id]);
+  if (!removed.length) await q('INSERT INTO thread_saves (member_id, thread_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, id]);
+  redirect(safeBack(str(form.get('back')) || `/forum/t/${id}`));
+}
+
+/** Market: the seller (or an admin) marks a listing sold, or puts it back up. */
+export async function toggleSold(form: FormData) {
+  const me = await requireUser();
+  const id = Number(form.get('id'));
+  await q(
+    `UPDATE threads SET status = CASE WHEN status = 'sold' THEN 'open' ELSE 'sold' END
+      WHERE id = $1 AND status IS NOT NULL AND (user_id = $2 OR $3)`,
+    [id, me.id, me.is_admin],
+  );
+  redirect(`/forum/t/${id}`);
+}
+
 export async function setThreadFlag(form: FormData) {
   await requireAdmin();
   const id = Number(form.get('id'));
@@ -218,6 +302,55 @@ export async function setThreadFlag(form: FormData) {
   if (flag === 'pinned') await q('UPDATE threads SET pinned = NOT pinned WHERE id = $1', [id]);
   if (flag === 'locked') await q('UPDATE threads SET locked = NOT locked WHERE id = $1', [id]);
   redirect(`/forum/t/${id}`);
+}
+
+/* ---------- reports ---------- */
+
+/** Flag a thread or comment for the admins. One open report per member per item. */
+export async function report(form: FormData) {
+  const me = await requireUser();
+  const threadId = Number(form.get('thread'));
+  const postId = Number(form.get('post')) || null;
+  const reason = REPORT_REASONS.find((r) => r === str(form.get('reason'))) ?? 'Other';
+  const note = str(form.get('note')).trim().slice(0, 500) || null;
+  const path = `/forum/t/${threadId}`;
+  const ok = postId
+    ? await one('SELECT 1 FROM posts WHERE id = $1 AND thread_id = $2', [postId, threadId])
+    : await one('SELECT 1 FROM threads WHERE id = $1', [threadId]);
+  if (!ok) redirect('/forum');
+  const row = await one<{ id: number }>(
+    `INSERT INTO reports (member_id, thread_id, post_id, reason, note) VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT DO NOTHING RETURNING id`,
+    [me.id, threadId, postId, reason, note],
+  );
+  if (row) {
+    const admins = await q<{ id: number }>('SELECT id FROM members WHERE is_admin AND NOT banned');
+    await notify([{ kind: 'report', ids: admins.map((a) => a.id) }], me.id, { threadId, postId });
+  }
+  redirect(`${path}?ok=${encodeURIComponent('Reported. Thanks.')}${postId ? `#p${postId}` : ''}`);
+}
+
+/** Admin: close a report (after acting on it, or not). */
+export async function resolveReport(form: FormData) {
+  const admin = await requireAdmin();
+  const r = await one<{ thread_id: number; post_id: number | null }>(
+    'UPDATE reports SET resolved_at = now(), resolved_by = $2 WHERE id = $1 AND resolved_at IS NULL RETURNING thread_id, post_id',
+    [Number(form.get('id')), admin.id],
+  );
+  if (r && str(form.get('hide')) === '1') {
+    // Hide it (restorable from Moderation), and close any other open reports about the same thing.
+    if (r.post_id) {
+      await q('UPDATE posts SET deleted = true WHERE id = $1', [r.post_id]);
+      await q('UPDATE threads t SET reply_count = (SELECT count(*)::int FROM posts p WHERE p.thread_id = t.id AND NOT p.deleted) WHERE t.id = $1', [r.thread_id]);
+    } else {
+      await q('UPDATE threads SET deleted = true WHERE id = $1', [r.thread_id]);
+    }
+    await q(
+      'UPDATE reports SET resolved_at = now(), resolved_by = $3 WHERE resolved_at IS NULL AND thread_id = $1 AND post_id IS NOT DISTINCT FROM $2',
+      [r.thread_id, r.post_id, admin.id],
+    );
+  }
+  redirect('/admin?tab=reports');
 }
 
 /* ---------- alerts ---------- */

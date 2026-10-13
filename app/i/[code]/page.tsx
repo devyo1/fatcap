@@ -20,20 +20,20 @@ export default async function InvitePage({ params, searchParams }: { params: Pro
         <span className="mono mute br">Invite / {code.slice(0, 4)}&hellip;</span>
         {me ? (
           <>
-            <h1 className="wide big">Already in</h1>
-            <p>You're signed in as {me.username}. Pass this one on.</p>
+            <h1 className="wide big">Signed in</h1>
+            <p className="mute">Signed in as {me.username}. This invite is unused.</p>
             <Link className="btn solid" href="/forum">Enter</Link>
           </>
         ) : !open ? (
           <>
-            <h1 className="wide big">Gone</h1>
-            <p className="mute">This invite has already been used, or it never existed.</p>
+            <h1 className="wide big">Invalid</h1>
+            <p className="mute">Used, revoked or unknown.</p>
             <Link className="mono mute" href="/">fatcap.club</Link>
           </>
         ) : (
           <>
-            <h1 className="wide big">You found one<span className="dot">.</span></h1>
-            <p className="mute">This works once. Pick a username and a password.</p>
+            <h1 className="wide big">Invite<span className="dot">.</span></h1>
+            <p className="mute">Single use. Choose a username and password.</p>
             <Notice error={error} />
             <form action={redeemInvite} className="stack" style={{ marginTop: 18 }}>
               <input type="hidden" name="code" value={code} />

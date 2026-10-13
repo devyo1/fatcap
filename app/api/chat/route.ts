@@ -4,6 +4,7 @@ import { q, one } from '@/lib/db';
 import { chatMessages, chatReactions, chatWindow, wipeOld, CHAT_MAX, CHAT_IMAGE_MAX } from '@/lib/chat';
 import { notify, idsForNames } from '@/lib/notify';
 import { mentionsIn } from '@/components/RichText';
+import { encodeImage } from '@/lib/media-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,8 +45,10 @@ export async function POST(req: Request) {
   await wipeOld();
   let imageId: number | null = null;
   if (image) {
-    const hex = Buffer.from(await image.arrayBuffer()).toString('hex');
-    const row = await one<{ id: number }>(`INSERT INTO chat_images (member_id, mime, data) VALUES ($1, $2, decode($3, 'hex')) RETURNING id`, [me.id, image.type, hex]);
+    // Re-encoded like every other upload, so no EXIF/GPS or other metadata survives.
+    const img = await encodeImage(Buffer.from(await image.arrayBuffer()));
+    if ('error' in img) return fail(img.error);
+    const row = await one<{ id: number }>(`INSERT INTO chat_images (member_id, mime, data) VALUES ($1, 'image/webp', decode($2, 'base64')) RETURNING id`, [me.id, img.data.toString('base64')]);
     imageId = row?.id ?? null;
   }
   const parent = replyTo

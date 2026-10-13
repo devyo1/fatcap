@@ -1,7 +1,8 @@
 import 'server-only';
 import { one } from './db';
+import { marketTodo } from './market';
 
-/** Unread conversations and unread alerts for a member. */
+/** Unread conversations, unread alerts, and market things waiting on a member. */
 export async function unreadCounts(memberId: number) {
   const row = await one<{ messages: number; alerts: number }>(
     `SELECT
@@ -12,5 +13,5 @@ export async function unreadCounts(memberId: number) {
        (SELECT count(*)::int FROM notifications WHERE member_id = $1 AND read_at IS NULL) AS alerts`,
     [memberId],
   );
-  return { messages: row?.messages ?? 0, alerts: row?.alerts ?? 0 };
+  return { messages: row?.messages ?? 0, alerts: row?.alerts ?? 0, market: await marketTodo(memberId) };
 }

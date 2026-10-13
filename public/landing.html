@@ -4,6 +4,12 @@
 <meta name="theme-color" content="#0E0E0D">
 <title>fatcap.club</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="fatcap">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -23,6 +29,7 @@ html,body{height:100%;overflow:hidden}
 body{background:var(--ink);color:var(--bone);font-family:var(--sans)}
 #field{position:fixed;inset:0;width:100%;height:100%;display:block}
 .stage{position:relative;z-index:1;height:100%;box-sizing:border-box;padding:var(--gut);display:grid;grid-template-rows:auto 1fr auto auto}
+.stage{padding-top:max(var(--gut),env(safe-area-inset-top));padding-bottom:max(var(--gut),env(safe-area-inset-bottom))}
 .mono{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
 .br::before{content:"[\00a0"}.br::after{content:"\00a0]"}
 .top{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
@@ -188,8 +195,9 @@ lForm.addEventListener('submit', async e => {
     const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok) { lMsg.textContent = 'In.'; location.href = data.next || '/forum'; return; }
+    var why = data.error;
   } catch (err) { console.error('Login failed:', err); }
-  btn.disabled = false; lMsg.textContent = 'Invalid details.';
+  btn.disabled = false; lMsg.textContent = why || 'Invalid details.';
   document.getElementById('lPass').value = '';
   panel.classList.remove('open', 'shake'); void panel.offsetWidth; if (!reduce) panel.classList.add('shake');
 });

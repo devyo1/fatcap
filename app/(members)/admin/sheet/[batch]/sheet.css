@@ -1,21 +1,18 @@
 .sheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-top: 24px; }
-.sticker { position: relative; background: #fff; color: #000; padding: 10px 10px 8px; display: flex; flex-direction: column; gap: 6px; break-inside: avoid; }
-.sticker.spent { opacity: .35; }
-.sticker .sq svg { display: block; width: 100%; height: auto; }
-.sticker .lab { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
-.sticker .wm { font-family: var(--sans); font-variation-settings: "wdth" 125; font-weight: 900; text-transform: uppercase; letter-spacing: -.04em; font-size: 13px; line-height: 1; }
-.sticker .d { color: var(--dot); }
-.sticker .cd { font-family: var(--mono); font-size: 9px; letter-spacing: .08em; color: #555; }
+.sticker { break-inside: avoid; }
+.sticker svg { display: block; width: 100%; height: auto; }
+.sticker.spent { opacity: .3; }
 .cell { display: flex; flex-direction: column; gap: 4px; }
 .cell .meta { display: flex; justify-content: flex-end; min-height: 22px; }
 
+/* 4 across at 43mm fits both Letter and A4 inside 10mm margins. */
 @media print {
   @page { margin: 10mm; }
   html, body { background: #fff !important; }
   .bar, .bg, .grain, .no-print { display: none !important; }
   main { padding: 0 !important; max-width: none !important; }
-  .sheet { grid-template-columns: repeat(4, 45mm); gap: 6mm; margin: 0; }
+  .sheet { grid-template-columns: repeat(4, 43mm); gap: 5mm; margin: 0; }
   .cell { display: block; }
-  .sticker { width: 45mm; padding: 3mm 3mm 2mm; outline: .2mm dashed #bbb; }
-  .sticker .d { color: #000; }
+  .sticker { width: 43mm; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

@@ -1,12 +1,14 @@
 import Link from 'next/link';
-import { ago } from '@/lib/format';
-import { boardBySlug } from '@/lib/config';
+import { ago, left } from '@/lib/format';
+import { placeName, subBySlug } from '@/lib/config';
 import Avatar from './Avatar';
+import { Hourglass, ImageIcon, Pin, Lock, Heart, Gavel } from './Icons';
 
 export type ThreadRow = {
   id: number;
   title: string;
   board: string;
+  topic?: string | null;
   author: string | null;
   reply_count: number;
   last_post_at: string;
@@ -16,34 +18,54 @@ export type ThreadRow = {
   unread?: boolean;
   props?: number;
   last_author?: string | null;
+  expires_at?: string | null;
+  price?: string | null;
+  status?: string | null;
+  cover?: string | null;
+  mode?: string | null;
+  auction_ends?: string | null;
 };
 
-export default function ThreadRows({ rows, showBoard = false, empty, numbered = false }: { rows: ThreadRow[]; showBoard?: boolean; empty: string; numbered?: boolean }) {
+/** Little markers shared by rows and listing cards: pinned, locked, vanishing, has pictures. */
+export function Marks({ t }: { t: ThreadRow }) {
+  return (
+    <>
+      {t.pinned && <span className="mark" title="Pinned"><Pin /></span>}
+      {t.locked && <span className="mark" title="Locked"><Lock /></span>}
+      {t.auction_ends && <span className="mark auction" title="Auction, time left"><Gavel />{left(t.auction_ends)}</span>}
+      {t.expires_at && <span className="mark vanish" title="Deletes itself"><Hourglass />{left(t.expires_at)}</span>}
+      {t.cover && <span className="mark" title="Images"><ImageIcon /></span>}
+      {t.props ? <span className="mark" title={`${t.props} ${t.props === 1 ? 'like' : 'likes'}`}><Heart />{t.props}</span> : null}
+    </>
+  );
+}
+
+/** `showBoard`: tag each row with "Board / Sub". `showTopic`: just the sub (on a board page). */
+export default function ThreadRows({ rows, showBoard = false, showTopic = false, empty }: { rows: ThreadRow[]; showBoard?: boolean; showTopic?: boolean; empty: string }) {
   if (!rows.length) return <p className="empty mono">{empty}</p>;
   return (
-    <ul className={`rows threads${numbered ? ' numbered' : ''}`}>
-      {rows.map((t, i) => (
+    <ul className="rows threads">
+      {rows.map((t) => (
         <li key={t.id}>
           <Link className={`row trow${t.unread ? ' unread' : ''}`} href={`/forum/t/${t.id}`}>
-            {numbered ? <span className="rank mono">{String(i + 1).padStart(2, '0')}</span> : <Avatar name={t.author} size={36} />}
+            <Avatar name={t.author} size={36} />
             <span className="tb">
               <span className="t">
                 {t.unread && <span className="new" aria-label="New activity" />}
                 {t.title}
               </span>
               <span className="m mono">
-                {t.pinned && <span className="pill on">Pinned</span>}
-                {t.locked && <span className="pill">Locked</span>}
-                {showBoard && <span className="board-tag">{boardBySlug(t.board)?.name ?? t.board}</span>}
+                {showBoard && <span className="board-tag">{placeName(t.board, t.topic)}</span>}
+                {showTopic && t.topic && <span className="board-tag">{subBySlug(t.board, t.topic)?.name}</span>}
                 <span>{t.author ?? 'gone'}</span>
-                {t.last_author && t.reply_count > 0
-                  ? <span>last: {t.last_author} {ago(t.last_post_at)}</span>
-                  : <span>{ago(t.last_post_at)}</span>}
+                <span title={t.last_author && t.reply_count > 0 ? `Last comment by ${t.last_author}` : undefined}>{ago(t.last_post_at)}</span>
+                {t.price && <span className={`price${t.status === 'sold' || t.status === 'ended' || t.status === 'closed' ? ' sold' : ''}`}>{t.status === 'sold' ? 'Sold' : t.status === 'ended' ? 'Ended' : t.status === 'closed' ? 'Closed' : t.price}</span>}
+                <Marks t={t} />
               </span>
             </span>
             <span className="stats-col mono">
-              <span><b>{t.reply_count}</b> {t.reply_count === 1 ? 'comment' : 'comments'}</span>
-              {t.props ? <span className="mute"><b>{t.props}</b> {t.props === 1 ? 'like' : 'likes'}</span> : null}
+              <b>{t.reply_count}</b>
+              <span className="mute">{t.reply_count === 1 ? 'comment' : 'comments'}</span>
             </span>
           </Link>
         </li>

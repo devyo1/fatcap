@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Avatar from './Avatar';
+import { haptic } from '@/lib/haptics';
+import GifButton from './GifButton';
 import RichText from './RichText';
 
 type Msg = {
@@ -67,6 +69,8 @@ export default function ChatRoom({ me, isAdmin, initial, reactions: firstReactio
       const r = await fetch(`/api/chat?after=${full ? 0 : lastId}`, { cache: 'no-store' });
       if (!r.ok) return;
       const d: { messages: Msg[]; reactions: Reactions; wipeAt: string } = await r.json();
+      // Someone else said something while you're here: a little buzz.
+      if (!full && lastId && d.messages.some((m) => m.username && m.username !== me)) haptic([12, 60, 12]);
       setWipeAt(d.wipeAt);
       setReactions(d.reactions);
       setMsgs((cur) => {
@@ -76,7 +80,14 @@ export default function ChatRoom({ me, isAdmin, initial, reactions: firstReactio
         return add.length ? [...cur, ...add].slice(-300) : cur;
       });
     } catch {}
-  }, [lastId]);
+  }, [lastId, me]);
+
+  // Pull-to-refresh reloads the room too.
+  useEffect(() => {
+    const again = () => load(true);
+    window.addEventListener('fc:refresh', again);
+    return () => window.removeEventListener('fc:refresh', again);
+  }, [load]);
 
   useEffect(() => {
     const t = setInterval(() => { if (document.visibilityState === 'visible') load(); }, POLL_MS);
@@ -235,7 +246,7 @@ export default function ChatRoom({ me, isAdmin, initial, reactions: firstReactio
             </div>
           );
         }) : (
-          <p className="empty mono chat-empty">Fresh slate. Say something.</p>
+          <p className="empty mono chat-empty">No messages.</p>
         )}
       </div>
 
@@ -259,6 +270,7 @@ export default function ChatRoom({ me, isAdmin, initial, reactions: firstReactio
       <form className="chat-compose" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={(e) => pick(e.target.files?.[0])} />
         <button type="button" className="attach" onClick={() => fileRef.current?.click()} aria-label="Add a picture or GIF"><ImageIcon /></button>
+        <GifButton className="attach gif-attach" onFile={(f) => pick(f)} />
         <label className="sr" htmlFor="chat-input">Message everyone</label>
         <textarea
           id="chat-input" ref={inputRef} className="textarea" rows={1} maxLength={max} value={text} placeholder="Message everyone"

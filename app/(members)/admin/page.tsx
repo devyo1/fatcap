@@ -3,16 +3,18 @@ import { cookies } from 'next/headers';
 import { q, one } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { ago, date } from '@/lib/format';
-import { makeStickers, resetPassword } from '@/app/actions';
+import { makeStickers, resetPassword, resolveReport } from '@/app/actions';
 import { banMember, unbanMember, toggleAdmin, wipeMemberPosts, moderate, removeMock } from '@/app/admin-actions';
 import Avatar from '@/components/Avatar';
 import Notice from '@/components/Notice';
+import RichText from '@/components/RichText';
 
 export const metadata = { title: 'Admin' };
 
 const TABS = [
   { id: 'overview', name: 'Overview' },
   { id: 'members', name: 'Members' },
+  { id: 'reports', name: 'Reports' },
   { id: 'moderation', name: 'Moderation' },
   { id: 'stickers', name: 'Stickers' },
   { id: 'tree', name: 'Invite tree' },
@@ -173,7 +175,7 @@ async function Moderation({ show }: { show: string }) {
                   <Link href={`/forum/t/${r.thread_id}${r.kind === 'post' ? `#p${r.id}` : ''}`}>{r.title}</Link> / {ago(r.created_at)}
                   {r.deleted && <> / <span className="ban-note">hidden</span></>}
                 </p>
-                <p className="mod-body">{r.body.slice(0, 280)}{r.body.length > 280 ? '...' : ''}</p>
+                <RichText className="body mod-body" text={r.body.length > 280 ? `${r.body.slice(0, 280)}...` : r.body} />
               </div>
             </div>
             <form action={moderate} className="acts">
@@ -187,6 +189,51 @@ async function Moderation({ show }: { show: string }) {
         {!rows.length && <li className="empty mono">Nothing here.</li>}
       </ul>
     </>
+  );
+}
+
+async function Reports() {
+  const rows = await q<{
+    id: number; reason: string; note: string | null; created_at: string; reporter: string | null;
+    thread_id: number; post_id: number | null; title: string; body: string; author: string | null; deleted: boolean;
+  }>(
+    `SELECT r.id, r.reason, r.note, r.created_at, rm.username AS reporter, r.thread_id, r.post_id, t.title,
+            COALESCE(p.body, t.body) AS body, COALESCE(pu.username, tu.username) AS author, COALESCE(p.deleted, t.deleted) AS deleted
+       FROM reports r
+       JOIN threads t ON t.id = r.thread_id
+       LEFT JOIN posts p ON p.id = r.post_id
+       LEFT JOIN members rm ON rm.id = r.member_id
+       LEFT JOIN members tu ON tu.id = t.user_id
+       LEFT JOIN members pu ON pu.id = p.user_id
+      WHERE r.resolved_at IS NULL
+      ORDER BY r.created_at DESC LIMIT 100`,
+  );
+  return (
+    <ul className="mod-list">
+      {rows.map((r) => (
+        <li key={r.id}>
+          <div className="mod-who">
+            <Avatar name={r.author} size={30} />
+            <div style={{ minWidth: 0 }}>
+              <p className="mono mute">
+                <span className="pill on">{r.reason}</span> {r.post_id ? 'Comment' : 'Thread'} by <b className="who">{r.author ?? 'gone'}</b> in{' '}
+                <Link href={`/forum/t/${r.thread_id}${r.post_id ? `#p${r.post_id}` : ''}`}>{r.title}</Link> / reported by {r.reporter ?? 'gone'} {ago(r.created_at)}
+                {r.deleted && <> / <span className="ban-note">hidden</span></>}
+              </p>
+              {r.note && <p className="mod-note">{r.note}</p>}
+              <RichText className="body mod-body" text={r.body.length > 280 ? `${r.body.slice(0, 280)}...` : r.body} />
+            </div>
+          </div>
+          <div className="acts">
+            {!r.deleted && (
+              <form action={resolveReport}><Hidden id={r.id} /><input type="hidden" name="hide" value="1" /><button className="chip danger" type="submit">Hide + close</button></form>
+            )}
+            <form action={resolveReport}><Hidden id={r.id} /><button className="chip" type="submit">Close</button></form>
+          </div>
+        </li>
+      ))}
+      {!rows.length && <li className="empty mono">No open reports.</li>}
+    </ul>
   );
 }
 
@@ -274,6 +321,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   const me = await requireAdmin();
   const sp = await searchParams;
   const tab: Tab = (TABS.find((t) => t.id === sp.tab)?.id ?? 'overview') as Tab;
+  const open = (await one<{ n: number }>('SELECT count(*)::int AS n FROM reports WHERE resolved_at IS NULL'))?.n ?? 0;
   let flash: { user?: string; temp?: string } | null = null;
   try { flash = JSON.parse((await cookies()).get('fc_flash')?.value ?? 'null'); } catch {}
 
@@ -283,7 +331,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         <h1 className="title">Admin</h1>
       </div>
       <nav className="subtabs mono big" aria-label="Admin sections">
-        {TABS.map((t) => <Link key={t.id} href={`/admin?tab=${t.id}`} aria-current={tab === t.id ? 'page' : undefined}>{t.name}</Link>)}
+        {TABS.map((t) => <Link key={t.id} href={`/admin?tab=${t.id}`} aria-current={tab === t.id ? 'page' : undefined}>{t.name}{t.id === 'reports' && open ? <span className="count">{open}</span> : null}</Link>)}
       </nav>
       <Notice error={sp.error} ok={sp.ok} />
       {flash?.temp && (
@@ -294,6 +342,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       <div className="section" style={{ marginTop: 22 }}>
         {tab === 'overview' && <Overview />}
         {tab === 'members' && <Members search={sp.s ?? ''} meId={me.id} />}
+        {tab === 'reports' && <Reports />}
         {tab === 'moderation' && <Moderation show={['live', 'hidden', 'all'].includes(sp.show ?? '') ? sp.show! : 'live'} />}
         {tab === 'stickers' && <Stickers />}
         {tab === 'tree' && <Tree />}

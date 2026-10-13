@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { logout } from '@/app/actions';
 import Avatar from './Avatar';
+import { haptic } from '@/lib/haptics';
 
 const Count = ({ n }: { n: number }) => (n > 0 ? <span className="count" aria-hidden="true">{n > 99 ? '99+' : n}</span> : null);
 
@@ -25,21 +26,31 @@ const CapIcon = () => (
 
 /**
  * Messages, alerts and the profile menu. The server sends first counts; after each
- * navigation (and every 30s) they're re-read, so opening a message clears its badge.
+ * navigation (and every 15s) they're re-read, so opening a message clears its badge.
  */
-export default function QuickNav({ username, isAdmin, initial }: { username: string; isAdmin: boolean; initial: { messages: number; alerts: number } }) {
+export default function QuickNav({ username, isAdmin, initial }: { username: string; isAdmin: boolean; initial: { messages: number; alerts: number; market: number } }) {
   const path = usePathname();
   const [counts, setCounts] = useState(initial);
+  const last = useRef(initial);
+  const [bump, setBump] = useState(0);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
-    const load = () => fetch('/api/counts', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((c) => { if (alive && c) setCounts(c); }).catch(() => {});
+    const load = () => fetch('/api/counts', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((c) => {
+      if (!alive || !c) return;
+      // A new DM or alert while the app is open: buzz and bump the badge.
+      const prev = last.current;
+      if (c.messages > prev.messages || c.alerts > prev.alerts || (c.market ?? 0) > (prev.market ?? 0)) { haptic([12, 60, 12]); setBump((b) => b + 1); }
+      last.current = c;
+      setCounts(c);
+    }).catch(() => {});
     const first = setTimeout(load, 400); // let the page mark things read first
-    const every = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 30000);
+    const every = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 15000);
+    window.addEventListener('fc:refresh', load);
     setOpen(false);
-    return () => { alive = false; clearTimeout(first); clearInterval(every); };
+    return () => { alive = false; clearTimeout(first); clearInterval(every); window.removeEventListener('fc:refresh', load); };
   }, [path]);
 
   useEffect(() => {
@@ -55,24 +66,27 @@ export default function QuickNav({ username, isAdmin, initial }: { username: str
   return (
     <nav className="quick" aria-label="You">
       <Link href="/messages" className="icon-btn" aria-label={`Messages${counts.messages ? `, ${counts.messages} unread` : ''}`} title="Messages">
-        <MsgIcon /><Count n={counts.messages} />
+        <MsgIcon /><Count key={`m${bump}`} n={counts.messages} />
       </Link>
       <Link href="/alerts" className="icon-btn" aria-label={`Alerts${counts.alerts ? `, ${counts.alerts} new` : ''}`} title="Alerts">
-        <CapIcon /><Count n={counts.alerts} />
+        <CapIcon /><Count key={`a${bump}`} n={counts.alerts} />
       </Link>
       <div className="me-menu" ref={menuRef}>
         <button type="button" className="me-btn" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu" aria-label="Your account">
           <Avatar name={username} size={30} />
+          {counts.market > 0 && <span className="me-dot" aria-label={`${counts.market} market ${counts.market === 1 ? 'thing' : 'things'} waiting`} />}
         </button>
         {open && (
           <div className="dropdown mono" role="menu">
             <div className="dd-head"><Avatar name={username} size={36} /><span>{username}</span></div>
             <Link role="menuitem" href={profile}>View profile</Link>
             <Link role="menuitem" href="/settings">Edit profile</Link>
+            <Link role="menuitem" href="/market" className="dd-market">Market{counts.market ? <span className="count">{counts.market}</span> : null}</Link>
+            <Link role="menuitem" href="/saved">Saved</Link>
             <Link role="menuitem" href="/messages">Messages</Link>
             <Link role="menuitem" href="/alerts">Alerts</Link>
             {isAdmin && <Link role="menuitem" href="/admin">Admin</Link>}
-            <form action={logout}><button role="menuitem" type="submit">Log out</button></form>
+            <form action={logout} data-logout><button role="menuitem" type="submit">Log out</button></form>
           </div>
         )}
       </div>

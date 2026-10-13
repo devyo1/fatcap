@@ -7,7 +7,10 @@ const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', displ
 
 export const metadata: Metadata = {
   title: { default: 'fatcap.club', template: '%s / fatcap.club' },
-  icons: { icon: '/favicon.svg' },
+  icons: { icon: '/favicon.svg', apple: '/apple-touch-icon.png' },
+  // Added to an iPhone home screen it runs full-screen, ink running up under the status bar.
+  appleWebApp: { capable: true, title: 'fatcap', statusBarStyle: 'black-translucent' },
+  other: { 'apple-mobile-web-app-capable': 'yes' }, // Next only writes the generic tag; older iOS wants this one
   robots: { index: false, follow: false },
 };
 

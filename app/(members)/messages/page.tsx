@@ -4,6 +4,7 @@ import { q } from '@/lib/db';
 import { requireUser, usernameKey } from '@/lib/auth';
 import { ago } from '@/lib/format';
 import { RefreshEvery } from '@/components/Live';
+import { plain } from '@/lib/media-token';
 
 export const metadata = { title: 'Messages' };
 
@@ -50,13 +51,13 @@ export default async function Messages() {
               <Link className={`row${c.unread ? ' unread' : ''}`} href={`/messages/${encodeURIComponent(c.other)}`}>
                 <span className="t">{c.unread && <span className="new" aria-label="Unread" />}{c.other}</span>
                 <span className="n mono">{ago(c.last_message_at)}</span>
-                <span className="m snippet">{c.from_me ? 'You: ' : ''}{(c.snippet ?? '').slice(0, 140)}</span>
+                <span className="m snippet">{c.from_me ? 'You: ' : ''}{plain(c.snippet ?? '').slice(0, 140)}</span>
               </Link>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="empty mono">No messages yet. Open someone's profile and hit Message.</p>
+        <p className="empty mono">No messages.</p>
       )}
     </>
   );

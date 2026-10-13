@@ -1,31 +1,34 @@
 import Link from 'next/link';
 import { q } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
-import { boardBySlug } from '@/lib/config';
+import { placeName } from '@/lib/config';
 import { ago } from '@/lib/format';
+import { plain } from '@/lib/media-token';
+import Avatar from '@/components/Avatar';
 
 export const metadata = { title: 'Search' };
 
-type Hit = { thread_id: number; post_id: number | null; title: string; board: string; author: string | null; snippet: string; at: string };
+type Hit = { thread_id: number; post_id: number | null; title: string; board: string; topic: string | null; author: string | null; snippet: string; at: string };
 
 export default async function Search({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   await requireUser();
   const term = ((await searchParams).q ?? '').trim().slice(0, 80);
   const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  const who = `%${term.replace(/^@/, '').replace(/[\\%_]/g, (c) => `\\${c}`)}%`.toLowerCase();
   const [hits, people] = term.length >= 2
     ? await Promise.all([
         q<Hit>(
-          `(SELECT t.id AS thread_id, NULL::int AS post_id, t.title, t.board, u.username AS author, left(t.body, 200) AS snippet, t.created_at AS at
+          `(SELECT t.id AS thread_id, NULL::int AS post_id, t.title, t.board, t.topic, u.username AS author, left(t.body, 200) AS snippet, t.created_at AS at
               FROM threads t LEFT JOIN members u ON u.id = t.user_id
              WHERE NOT t.deleted AND (t.title ILIKE $1 OR t.body ILIKE $1))
            UNION ALL
-           (SELECT t.id, p.id, t.title, t.board, u.username, left(p.body, 200), p.created_at
+           (SELECT t.id, p.id, t.title, t.board, t.topic, u.username, left(p.body, 200), p.created_at
               FROM posts p JOIN threads t ON t.id = p.thread_id LEFT JOIN members u ON u.id = p.user_id
              WHERE NOT t.deleted AND NOT p.deleted AND p.body ILIKE $1)
            ORDER BY at DESC LIMIT 40`,
           [like],
         ),
-        q<{ username: string }>('SELECT username FROM members WHERE username_key LIKE $1 AND NOT banned ORDER BY username LIMIT 12', [like.toLowerCase()]),
+        q<{ username: string }>('SELECT username FROM members WHERE username_key LIKE $1 AND NOT banned ORDER BY username_key LIKE $2 DESC, username LIMIT 24', [who, who.slice(1)]),
       ])
     : [[], []];
 
@@ -34,7 +37,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
       <div className="head"><h1 className="title">Search</h1></div>
       <form className="searchbar" action="/search" role="search">
         <label className="sr" htmlFor="q">Search threads, comments and members</label>
-        <input className="input" id="q" name="q" defaultValue={term} placeholder="Threads, comments, members" autoComplete="off" />
+        <input className="input" id="q" name="q" defaultValue={term} placeholder="Threads, comments, @members" autoComplete="off" />
         <button className="btn" type="submit">Search</button>
       </form>
 
@@ -42,8 +45,8 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
         <>
           {people.length > 0 && (
             <section className="section mono">
-              <span className="mute br">Members</span>
-              <p className="peoplelist">{people.map((p) => <Link key={p.username} href={`/u/${encodeURIComponent(p.username)}`}>{p.username}</Link>)}</p>
+              <span className="mute br" style={{ display: 'block', marginBottom: 10 }}>Members</span>
+              <ul className="people">{people.map((p) => <li key={p.username}><Link href={`/u/${encodeURIComponent(p.username)}`}><Avatar name={p.username} size={24} />{p.username}</Link></li>)}</ul>
             </section>
           )}
           <section className="section">
@@ -55,13 +58,13 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
                     <Link className="row" href={`/forum/t/${h.thread_id}${h.post_id ? `#p${h.post_id}` : ''}`}>
                       <span className="t">{h.title}</span>
                       <span className="n mono">{h.post_id ? 'Comment' : 'Thread'}</span>
-                      <span className="m snippet">{h.snippet}</span>
-                      <span className="m mono"><span>{boardBySlug(h.board)?.name}</span><span>{h.author ?? 'gone'}</span><span>{ago(h.at)}</span></span>
+                      <span className="m snippet">{plain(h.snippet)}</span>
+                      <span className="m mono"><span>{placeName(h.board, h.topic)}</span><span>{h.author ?? 'gone'}</span><span>{ago(h.at)}</span></span>
                     </Link>
                   </li>
                 ))}
               </ul>
-            ) : <p className="empty mono">Nothing matches.</p>}
+            ) : <p className="empty mono">No results.</p>}
           </section>
         </>
       )}
