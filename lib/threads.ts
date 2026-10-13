@@ -23,18 +23,19 @@ const COLUMNS = `
   (SELECT m.username FROM posts p JOIN members m ON m.id = p.user_id
     WHERE p.thread_id = t.id AND NOT p.deleted ORDER BY p.created_at DESC LIMIT 1) AS last_author`;
 
-// The card view also wants: the post's text (pictures taken out), its first four pictures with
-// their sizes (and how many there are), whether the viewer liked / saved it, and the latest comment
+// Cards and Grid also want: the post's text (pictures taken out), its first ten pictures with
+// their sizes and captions (and how many there are), whether the viewer liked / saved it, and the latest comment
 // (not from someone they blocked).
 const CARD_COLUMNS = `,
   left(regexp_replace(t.body, '\\[img:[A-Za-z0-9_-]{16}\\][^\\n]*\\n?', '', 'g'), 900) AS text,
-  (SELECT json_agg(json_build_object('id', md.id, 'w', md.width, 'h', md.height, 'a', md.animated) ORDER BY x.ord)
-     FROM regexp_matches(t.body, '\\[img:([A-Za-z0-9_-]{16})\\]', 'g') WITH ORDINALITY AS x(m, ord)
+  (SELECT json_agg(json_build_object('id', md.id, 'w', md.width, 'h', md.height, 'a', md.animated, 'c', left(btrim(x.m[2]), 120)) ORDER BY x.ord)
+     FROM regexp_matches(t.body, '\\[img:([A-Za-z0-9_-]{16})\\][ \\t]*([^\\n]*)', 'g') WITH ORDINALITY AS x(m, ord)
      JOIN media md ON md.id = x.m[1]
-    WHERE x.ord <= 4) AS pics,
+    WHERE x.ord <= 10) AS pics,
   (SELECT count(*)::int FROM regexp_matches(t.body, '\\[img:[A-Za-z0-9_-]{16}\\]', 'g') AS y) AS pic_count,
   EXISTS (SELECT 1 FROM props WHERE target = 'thread' AND target_id = t.id AND member_id = $1) AS mine,
   EXISTS (SELECT 1 FROM thread_saves sv WHERE sv.thread_id = t.id AND sv.member_id = $1) AS saved,
+  COALESCE((SELECT tf.following FROM thread_follows tf WHERE tf.thread_id = t.id AND tf.member_id = $1), false) AS following,
   (SELECT json_build_object('author', cu.username, 'body', left(regexp_replace(cp.body, '\\[img:[A-Za-z0-9_-]{16}\\][^\\n]*', '', 'g'), 200))
      FROM posts cp LEFT JOIN members cu ON cu.id = cp.user_id
     WHERE cp.thread_id = t.id AND NOT cp.deleted

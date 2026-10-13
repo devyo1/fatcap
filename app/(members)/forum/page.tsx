@@ -9,10 +9,11 @@ import { SortTabs, ForumTree, BoardChips } from '@/components/ForumNav';
 import Pulse from '@/components/Pulse';
 import MoreRows from '@/components/MoreRows';
 import ThreadCards from '@/components/ThreadCards';
+import ThreadGrid from '@/components/ThreadGrid';
 import ViewToggle from '@/components/ViewToggle';
 import { layoutOf } from '@/lib/view';
 
-const BATCH = 25;
+const BATCH = 24; // divides into rows of 2, 3 and 4 tiles
 
 export const metadata = { title: 'Forum' };
 
@@ -27,10 +28,10 @@ export default async function Forum({ searchParams }: { searchParams: Promise<{ 
   const { welcome, view: rawView } = await searchParams;
   const view = rawView === 'recent' || rawView === 'top' ? rawView : 'feed';
   const layout = await layoutOf();
-  const cards = layout === 'cards';
+  const rich = layout !== 'list';
 
   const [feed, stats, online, totals, tags] = await Promise.all([
-    view === 'feed' ? feedThreads(me, BATCH + 1, 0, cards) : listThreads(me, { sort: view, limit: BATCH + 1, cards }).then((r) => r.rows),
+    view === 'feed' ? feedThreads(me, BATCH + 1, 0, rich) : listThreads(me, { sort: view, limit: BATCH + 1, cards: rich }).then((r) => r.rows),
     topicStats(me),
     q<{ username: string }>(`SELECT username FROM members WHERE last_seen_at > now() - interval '15 minutes' AND NOT banned ORDER BY last_seen_at DESC LIMIT 24`),
     one<{ members: number; threads: number; comments: number }>(
@@ -41,6 +42,7 @@ export default async function Forum({ searchParams }: { searchParams: Promise<{ 
     popularTags(12),
   ]);
   const rows = feed.slice(0, BATCH);
+  const empty = view === 'top' ? 'Nothing this month.' : 'No threads yet.';
 
   return (
     <>
@@ -63,10 +65,10 @@ export default async function Forum({ searchParams }: { searchParams: Promise<{ 
       <div className="split">
         <section>
           <SortTabs label="Feed" items={VIEWS} current={view} />
-          {cards
-            ? <ThreadCards rows={rows} empty={view === 'top' ? 'Nothing this month.' : 'No threads yet.'} />
-            : <ThreadRows rows={rows} showBoard empty={view === 'top' ? 'Nothing this month.' : 'No threads yet.'} />}
-          {feed.length > BATCH && <MoreRows key={`${view}-${layout}`} query={{ view, cards }} start={BATCH} have={rows.map((r) => r.id)} size={BATCH} showBoard />}
+          {layout === 'cards' ? <ThreadCards rows={rows} empty={empty} />
+            : layout === 'grid' ? <ThreadGrid rows={rows} empty={empty} />
+            : <ThreadRows rows={rows} showBoard empty={empty} />}
+          {feed.length > BATCH && <MoreRows key={`${view}-${layout}`} query={{ view, rich }} start={BATCH} have={rows.map((r) => r.id)} size={BATCH} as={layout === 'list' ? 'rows' : layout} showBoard />}
         </section>
 
         <aside className="side">

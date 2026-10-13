@@ -40,9 +40,14 @@ function useSwitch(key: string, server: boolean, send: (on: boolean) => Promise<
   return [on, flip] as const;
 }
 
+/** A like's state for a thread or comment, shared by the heart and (in Cards) the double tap. */
+export function useLike(target: 'thread' | 'post', id: number, mine: boolean) {
+  return useSwitch(`like:${target}:${id}`, mine, (v) => setLike(target, id, v).then((r) => r.on));
+}
+
 /** Like a thread or comment. The count moves with you; others' likes show on the next load. */
 export function LikeButton({ target, id, count, mine, label = true }: { target: 'thread' | 'post'; id: number; count: number; mine: boolean; label?: boolean }) {
-  const [on, flip] = useSwitch(`like:${target}:${id}`, mine, (v) => setLike(target, id, v).then((r) => r.on));
+  const [on, flip] = useLike(target, id, mine);
   const [pop, setPop] = useState(false);
   const n = count - (mine ? 1 : 0) + (on ? 1 : 0);
   return (

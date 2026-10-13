@@ -5,6 +5,7 @@ import { moreThreads, type MoreQuery } from '@/app/browse-actions';
 import ThreadRows, { type ThreadRow } from './ThreadRows';
 import ListingGrid from './ListingGrid';
 import ThreadCards from './ThreadCards';
+import ThreadGrid from './ThreadGrid';
 
 const AUTO = 150; // loads by itself until this many rows are showing; past that it waits for a tap
 const KEEP = 15 * 60 * 1000; // how long rows loaded here are kept for coming back
@@ -23,10 +24,9 @@ function recall(key: string, start: number): Loaded | null {
  * are remembered for this tab, so going into a thread and coming back finds the list as long as
  * it was, at the same spot.
  */
-export default function MoreRows({ query, start, have, size, grid = false, showBoard = false, showTopic = false }: {
-  query: MoreQuery; start: number; have: number[]; size: number; grid?: boolean; showBoard?: boolean; showTopic?: boolean;
+export default function MoreRows({ query, start, have, size, as = 'rows', showBoard = false, showTopic = false }: {
+  query: MoreQuery; start: number; have: number[]; size: number; as?: 'rows' | 'cards' | 'grid' | 'listings'; showBoard?: boolean; showTopic?: boolean;
 }) {
-  const cards = !!query.cards;
   const key = `more:${JSON.stringify(query)}`;
   // False while hydrating (so the first render matches the server's), true from then on.
   const client = useSyncExternalStore(noop, () => true, () => false);
@@ -73,11 +73,12 @@ export default function MoreRows({ query, start, have, size, grid = false, showB
 
   return (
     <>
-      {rows.length > 0 && (grid
-        ? <ListingGrid rows={rows} empty="" showTopic={showTopic} />
-        : cards
-          ? <ThreadCards rows={rows} empty="" place={showBoard || showTopic} />
-          : <ThreadRows rows={rows} empty="" showBoard={showBoard} showTopic={showTopic} />)}
+      {rows.length > 0 && (
+        as === 'listings' ? <ListingGrid rows={rows} empty="" showTopic={showTopic} />
+        : as === 'cards' ? <ThreadCards rows={rows} empty="" place={showBoard || showTopic} />
+        : as === 'grid' ? <ThreadGrid rows={rows} empty="" />
+        : <ThreadRows rows={rows} empty="" showBoard={showBoard} showTopic={showTopic} />
+      )}
       {!done && (
         <button ref={end} type="button" className="more-btn mono" onClick={load} disabled={busy} aria-busy={busy}>
           {busy ? <span className="more-dots" aria-label="Loading"><i /><i /><i /></span> : failed ? 'Couldn’t load. Try again' : 'Show more'}

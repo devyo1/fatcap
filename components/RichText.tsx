@@ -107,6 +107,13 @@ export function picAttrs(id: string, info: MediaInfo[string] | undefined, sizes:
   };
 }
 
+/** A square crop of a picture (the server picks the crop), for frames that are all the same shape. Animations keep the original. */
+export function squareAttrs(id: string, info: MediaInfo[string] | undefined, sizes: string) {
+  const url = mediaUrl(id);
+  if (info?.anim) return { src: url };
+  return { src: `${url}?w=480&sq=1`, srcSet: `${url}?w=240&sq=1 240w, ${url}?w=480&sq=1 480w, ${url}?w=960&sq=1 960w`, sizes };
+}
+
 const SIZES = {
   one: '(max-width: 760px) calc(100vw - 32px), 640px',
   half: '(max-width: 760px) 50vw, 320px',

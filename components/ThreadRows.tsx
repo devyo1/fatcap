@@ -31,10 +31,11 @@ export type ThreadRow = {
   meetup_area?: string | null;
   // card view only
   text?: string | null;
-  pics?: { id: string; w: number; h: number; a: boolean }[] | null;
+  pics?: { id: string; w: number; h: number; a: boolean; c?: string | null }[] | null;
   pic_count?: number;
   mine?: boolean;
   saved?: boolean;
+  following?: boolean;
   last_comment?: { author: string | null; body: string } | null;
 };
 

@@ -403,7 +403,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
 
       <Pulse thread={thread.id} since={new Date().toISOString()} />
       {readingMinutes(thread.body) >= 3 && <ReadingBar target="op" />}
-      <section className="comments" aria-label="Comments">
+      <section className="comments" id="comments" aria-label="Comments">
         <div className="comments-head mono">
           <span className="br">{thread.reply_count} {thread.reply_count === 1 ? 'comment' : 'comments'}</span>
           {fresh.length > 0 && <a className="jump" href={`#p${fresh[0].id}`}>{fresh.length} new &darr;</a>}

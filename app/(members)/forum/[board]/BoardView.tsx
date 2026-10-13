@@ -9,6 +9,7 @@ import ListingGrid from '@/components/ListingGrid';
 import DealsBanner from '@/components/DealsBanner';
 import MoreRows from '@/components/MoreRows';
 import ThreadCards from '@/components/ThreadCards';
+import ThreadGrid from '@/components/ThreadGrid';
 import ViewToggle from '@/components/ViewToggle';
 import { layoutOf } from '@/lib/view';
 import { SortTabs, SubForums } from '@/components/ForumNav';
@@ -25,11 +26,11 @@ export default async function BoardView({ boardSlug, subSlug, sort: sortParam }:
   if (subSlug && !sub) notFound();
   const sort = sortOf(sortParam);
   const layout = board.market ? 'list' : await layoutOf();
-  const cards = layout === 'cards';
+  const rich = layout !== 'list';
 
   const size = board.market ? 24 : 30;
   const [{ rows, more }, stats, open] = await Promise.all([
-    listThreads(me, { board: board.slug, topic: sub?.slug, sort, limit: size, cards }),
+    listThreads(me, { board: board.slug, topic: sub?.slug, sort, limit: size, cards: rich }),
     topicStats(me, board.slug),
     board.market ? openDeals(me.id) : null,
   ]);
@@ -80,13 +81,13 @@ export default async function BoardView({ boardSlug, subSlug, sort: sortParam }:
       </div>
       {board.market
         ? <ListingGrid rows={rows} showTopic={!sub} empty={empty} />
-        : cards
-          ? <ThreadCards rows={rows} empty={empty} place={!sub} />
-          : <ThreadRows rows={rows} showTopic={!sub} empty={empty} />}
+        : layout === 'cards' ? <ThreadCards rows={rows} empty={empty} place={!sub} />
+        : layout === 'grid' ? <ThreadGrid rows={rows} empty={empty} />
+        : <ThreadRows rows={rows} showTopic={!sub} empty={empty} />}
       {more && (
         <MoreRows
-          key={`${board.slug}/${sub?.slug ?? ''}/${sort}/${layout}`} query={{ board: board.slug, topic: sub?.slug, sort, cards }}
-          start={size} have={rows.map((r) => r.id)} size={size} grid={board.market} showTopic={!sub}
+          key={`${board.slug}/${sub?.slug ?? ''}/${sort}/${layout}`} query={{ board: board.slug, topic: sub?.slug, sort, rich }}
+          start={size} have={rows.map((r) => r.id)} size={size} as={board.market ? 'listings' : layout === 'list' ? 'rows' : layout} showTopic={!sub}
         />
       )}
     </>
