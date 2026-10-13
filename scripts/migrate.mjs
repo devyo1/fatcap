@@ -311,6 +311,28 @@ const statements = [
     data       bytea NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now()
   )`,
+
+  // v11: Market posts wait for an admin (review: 'pending' or 'rejected'; null = live), digital zines.
+  `ALTER TABLE threads ADD COLUMN IF NOT EXISTS review text CHECK (review IN ('pending', 'rejected'))`,
+  `ALTER TABLE threads ADD COLUMN IF NOT EXISTS review_note text`,
+  `CREATE INDEX IF NOT EXISTS threads_review_idx ON threads (created_at) WHERE review IS NOT NULL`,
+  `ALTER TABLE listings ADD COLUMN IF NOT EXISTS format text NOT NULL DEFAULT 'physical' CHECK (format IN ('physical', 'digital'))`,
+  `ALTER TABLE listings ADD COLUMN IF NOT EXISTS shape text NOT NULL DEFAULT 'tall' CHECK (shape IN ('tall', 'square'))`,
+  `ALTER TABLE listings ADD COLUMN IF NOT EXISTS preview_pages integer NOT NULL DEFAULT 3`,
+  `CREATE TABLE IF NOT EXISTS zine_pages (
+    thread_id integer NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+    n         integer NOT NULL,
+    kind      text NOT NULL CHECK (kind IN ('image', 'text')),
+    media_id  text,
+    body      text,
+    fit       text NOT NULL DEFAULT 'cover' CHECK (fit IN ('cover', 'contain')),
+    PRIMARY KEY (thread_id, n)
+  )`,
+  // A digital zine is a deal like any other, just with nothing to ship.
+  `ALTER TABLE deals DROP CONSTRAINT IF EXISTS deals_method_check`,
+  `ALTER TABLE deals ADD CONSTRAINT deals_method_check CHECK (method IN ('ship', 'meetup', 'digital'))`,
+  // Zines and books a member owns show on their profile, unless they'd rather not.
+  `ALTER TABLE members ADD COLUMN IF NOT EXISTS show_collection boolean NOT NULL DEFAULT true`,
 ];
 
 for (const s of statements) await exec(s);

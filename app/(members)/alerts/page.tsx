@@ -40,12 +40,16 @@ function line(a: Alert): ReactNode {
     case 'outbid': return <>Outbid on {title}</>;
     case 'won': return <>You won {title}</>;
     case 'auction_ended': return <>Auction ended: {title}</>;
+    case 'review': return <><b>{a.actor ?? 'Someone'}</b> posted {title} to the Market. Waiting for review</>;
+    case 'approved': return <>{title} is up on the Market</>;
+    case 'rejected': return <>{title} wasn&apos;t approved for the Market</>;
     default: return <><b>{a.actor ?? 'Someone'}</b> {VERB[a.kind] ?? 'posted in'} {title}</>;
   }
 }
 
 function href(a: Alert) {
   if (a.kind === 'report') return '/admin?tab=reports';
+  if (a.kind === 'review') return '/admin?tab=review';
   if (a.deal_id) return `/market?deal=${a.deal_id}#d${a.deal_id}`;
   if (a.chat_id) return `/chat#c${a.chat_id}`;
   if (a.thread_id) return `/forum/t/${a.thread_id}${a.post_id ? `#p${a.post_id}` : ''}`;
@@ -54,7 +58,7 @@ function href(a: Alert) {
 
 const REPLIES = ['comment_reply', 'reply', 'follow', 'mention', 'chat_mention', 'chat_reply'];
 const MARKET = ['offer', 'offer_accepted', 'offer_declined', 'bought', 'bid', 'outbid', 'won', 'auction_ended', 'second_chance',
-  'deal_paid', 'deal_confirmed', 'deal_sent', 'deal_complete', 'deal_cancelled'];
+  'deal_paid', 'deal_confirmed', 'deal_sent', 'deal_complete', 'deal_cancelled', 'review', 'approved', 'rejected'];
 
 /** "Today", "Yesterday", "This week", "Earlier", in Montreal time (the club's clock, same as the chat wipe). */
 const dayOf = (x: Date) => Date.parse(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto' }).format(x));

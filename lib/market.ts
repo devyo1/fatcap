@@ -10,7 +10,10 @@ import { notify } from './notify';
 // "unpaid" mark on their market profile, and the seller can offer the item to the next bidder.
 
 export type Mode = 'fixed' | 'offers' | 'auction' | 'wanted';
-export type Method = 'ship' | 'meetup';
+export type Method = 'ship' | 'meetup' | 'digital';
+export type Format = 'physical' | 'digital';
+/** A digital zine never runs out: its stock is just this high. */
+export const DIGITAL_STOCK = 1_000_000;
 export const AUCTION_DAYS = [1, 3, 5, 7] as const;
 export const TRUST_LEVELS = [0, 1, 3, 5] as const;
 const SNIPE_MS = 2 * 60_000; // a bid in the last 2 minutes pushes the end back 2 minutes
@@ -20,6 +23,7 @@ export type Listing = {
   accept_offers: boolean; quantity: number; sold_count: number;
   ships: boolean; ship_cents: number | null; ship_note: string | null; meetup: boolean; meetup_area: string | null; trades: boolean;
   ends_at: string | null; increment_cents: number | null; min_deals: number; settled: boolean;
+  format: Format; shape: 'tall' | 'square'; preview_pages: number;
 };
 export type Bid = { id: number; buyer_id: number | null; bidder: string | null; amount_cents: number; method: Method | null; created_at: string };
 
@@ -27,7 +31,8 @@ export const available = (l: Listing) => Math.max(0, l.quantity - l.sold_count);
 export const auctionOpen = (l: Listing) => l.mode === 'auction' && !l.settled && !!l.ends_at && new Date(l.ends_at).getTime() > Date.now();
 export const increment = (l: Listing) => l.increment_cents || 100;
 export const nextBid = (l: Listing, top: number | null) => (top == null ? l.price_cents ?? 100 : top + increment(l));
-export const methods = (l: Listing): Method[] => [...(l.ships ? ['ship' as const] : []), ...(l.meetup ? ['meetup' as const] : [])];
+export const methods = (l: Listing): Method[] =>
+  l.format === 'digital' ? ['digital'] : [...(l.ships ? ['ship' as const] : []), ...(l.meetup ? ['meetup' as const] : [])];
 
 export async function getListing(threadId: number) {
   return one<Listing>('SELECT * FROM listings WHERE thread_id = $1', [threadId]);
@@ -72,6 +77,8 @@ export async function syncDisplay(threadId: number) {
     if (l.settled) status = l.sold_count > 0 ? 'sold' : 'ended';
   } else if (l.mode === 'wanted') {
     price = l.price_cents != null ? `Budget ${money(l.price_cents, l.currency)}` : 'Wanted';
+  } else if (l.format === 'digital') {
+    price = l.price_cents ? money(l.price_cents, l.currency) : 'Free';
   } else {
     price = l.price_cents != null ? money(l.price_cents, l.currency) : 'Offers';
     if (available(l) <= 0) status = 'sold';
@@ -87,7 +94,10 @@ export async function settleAuctions(force = false) {
   if (!force && Date.now() - lastSettle < 30_000) return;
   lastSettle = Date.now();
   const due = await q<{ thread_id: number }>(
-    `UPDATE listings SET settled = true WHERE mode = 'auction' AND NOT settled AND ends_at <= now() RETURNING thread_id`,
+    `UPDATE listings SET settled = true
+      WHERE mode = 'auction' AND NOT settled AND ends_at <= now()
+        AND thread_id IN (SELECT id FROM threads WHERE review IS NULL)
+      RETURNING thread_id`,
   );
   for (const { thread_id } of due) {
     const [l, t] = await Promise.all([
@@ -138,10 +148,16 @@ export const STEPS: Record<Method, Partial<Record<DealStatus, Step>>> = {
     agreed: { next: 'paid', who: 'buyer', label: 'Mark as paid', stamp: 'paid_at' },
     paid: { next: 'complete', who: 'seller', label: 'Confirm payment', stamp: 'completed_at' },
   },
+  // A digital zine: the seller confirming payment is what opens it up for the buyer.
+  digital: {
+    agreed: { next: 'paid', who: 'buyer', label: 'Mark as paid', stamp: 'paid_at' },
+    paid: { next: 'complete', who: 'seller', label: 'Confirm payment', stamp: 'completed_at' },
+  },
 };
 export const TRACK: Record<Method, { status: DealStatus; label: string }[]> = {
   ship: [{ status: 'agreed', label: 'Agreed' }, { status: 'paid', label: 'Paid' }, { status: 'confirmed', label: 'Confirmed' }, { status: 'sent', label: 'Shipped' }, { status: 'complete', label: 'Received' }],
   meetup: [{ status: 'agreed', label: 'Agreed' }, { status: 'paid', label: 'Paid' }, { status: 'complete', label: 'Done' }],
+  digital: [{ status: 'agreed', label: 'Agreed' }, { status: 'paid', label: 'Paid' }, { status: 'complete', label: 'Unlocked' }],
 };
 export const CANCEL_REASONS = {
   buyer: [{ id: 'changed', label: 'Changed my mind' }, { id: 'other', label: 'Other' }],

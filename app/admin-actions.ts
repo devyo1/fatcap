@@ -5,6 +5,12 @@ import { cookies } from 'next/headers';
 import { q, one } from '@/lib/db';
 import { requireAdmin, ADMIN_VIEW_COOKIE } from '@/lib/auth';
 import { str } from '@/lib/format';
+import { notify, idsForNames } from '@/lib/notify';
+import { syncDisplay } from '@/lib/market';
+import { mentionsIn } from '@/components/RichText';
+
+/** Only back to our own pages. */
+const safe = (p: string, fallback: string) => (p.startsWith('/') && !p.startsWith('//') ? p : fallback);
 
 const go = (tab: string, extra = '') => redirect(`/admin?tab=${tab}${extra}`);
 
@@ -102,4 +108,46 @@ export async function removeMock() {
     await recount(live.map((t) => t.id));
   }
   go('overview', `&ok=${encodeURIComponent(mock.length ? `Removed ${mock.length} mock members and everything they posted.` : 'No mock content left.')}`);
+}
+
+/* ---------- Market review ---------- */
+
+/**
+ * Put a Market post up. It goes live as new (top of New), and any clock it carries (an auction's
+ * end, a vanish time) starts now rather than counting the time it waited.
+ */
+export async function approveListing(form: FormData) {
+  const admin = await requireAdmin();
+  const id = Number(form.get('id'));
+  const t = await one<{ user_id: number | null; body: string }>(
+    `UPDATE threads SET review = NULL, review_note = NULL,
+            expires_at = CASE WHEN expires_at IS NULL THEN NULL ELSE now() + (expires_at - created_at) END,
+            created_at = now(), last_post_at = now()
+      WHERE id = $1 AND review IS NOT NULL AND NOT deleted RETURNING user_id, body`,
+    [id],
+  );
+  if (t) {
+    await q(
+      `UPDATE listings SET ends_at = CASE WHEN ends_at IS NULL THEN NULL ELSE now() + (ends_at - created_at) END, created_at = now()
+        WHERE thread_id = $1`,
+      [id],
+    );
+    await syncDisplay(id);
+    await notify([{ kind: 'approved', ids: [t.user_id] }], admin.id, { threadId: id });
+    await notify([{ kind: 'mention', ids: await idsForNames(mentionsIn(t.body)) }], t.user_id, { threadId: id });
+  }
+  redirect(safe(str(form.get('back')), '/admin?tab=review&ok=' + encodeURIComponent('Approved. It’s up.')));
+}
+
+/** Turn a Market post down, with a note for the seller. They can fix it and send it again. */
+export async function rejectListing(form: FormData) {
+  const admin = await requireAdmin();
+  const id = Number(form.get('id'));
+  const note = str(form.get('note')).trim().slice(0, 300) || null;
+  const t = await one<{ user_id: number | null }>(
+    `UPDATE threads SET review = 'rejected', review_note = $2 WHERE id = $1 AND review = 'pending' AND NOT deleted RETURNING user_id`,
+    [id, note],
+  );
+  if (t) await notify([{ kind: 'rejected', ids: [t.user_id] }], admin.id, { threadId: id });
+  redirect(safe(str(form.get('back')), '/admin?tab=review&ok=' + encodeURIComponent('Sent back to the seller.')));
 }

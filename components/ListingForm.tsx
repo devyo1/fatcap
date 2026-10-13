@@ -151,7 +151,7 @@ export default function ListingForm({ action, defaults = {}, id, frozen = false,
       <div className="field">
         <label className="mono" htmlFor="body">Details</label>
         <Writer id="body" rows={7} maxLength={LIMITS.body} defaultValue={defaults.body} draft={!id} />
-        <span className="hint mono">First image is the cover. Zines: add sample pages after it, in order.</span>
+        <span className="hint mono">First image is the cover. Printed zines: add sample pages after it, in order. (Making one to read here? Pick Zine or book at the top.)</span>
       </div>
       <div className="field">
         <label className="mono" htmlFor="vanish">Vanish</label>

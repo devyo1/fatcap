@@ -24,12 +24,12 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
         q<Hit>(
           `(SELECT t.id AS thread_id, NULL::int AS post_id, t.title, t.board, t.topic, u.username AS author, left(t.body, 200) AS snippet, t.created_at AS at
               FROM threads t LEFT JOIN members u ON u.id = t.user_id
-             WHERE NOT t.deleted AND (t.expires_at IS NULL OR t.expires_at > now()) AND (${match('t.title')} OR ${match('t.body')})
+             WHERE NOT t.deleted AND t.review IS NULL AND (t.expires_at IS NULL OR t.expires_at > now()) AND (${match('t.title')} OR ${match('t.body')})
                AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = t.user_id))
            UNION ALL
            (SELECT t.id, p.id, t.title, t.board, t.topic, u.username, left(p.body, 200), p.created_at
               FROM posts p JOIN threads t ON t.id = p.thread_id LEFT JOIN members u ON u.id = p.user_id
-             WHERE NOT t.deleted AND (t.expires_at IS NULL OR t.expires_at > now()) AND NOT p.deleted AND ${match('p.body')}
+             WHERE NOT t.deleted AND t.review IS NULL AND (t.expires_at IS NULL OR t.expires_at > now()) AND NOT p.deleted AND ${match('p.body')}
                AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = p.user_id))
            ORDER BY at DESC LIMIT 40`,
           [pattern, me.id],

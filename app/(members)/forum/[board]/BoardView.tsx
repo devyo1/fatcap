@@ -53,6 +53,7 @@ export default async function BoardView({ boardSlug, subSlug, sort: sortParam }:
         </div>
         <div className="actions">
           {!board.market && <ViewToggle layout={layout} />}
+          {board.market && sub?.slug === 'zines' && <Link className="btn" href={`/forum/${board.slug}/new?kind=zine`}>Make your own</Link>}
           {board.market && <Link className="btn" href="/market">Your market{waiting > 0 && <span className="count">{waiting}</span>}</Link>}
           <Link className={`btn solid${board.market ? '' : ' hide-phone'}`} href={`/forum/${board.slug}/new${sub ? `?in=${sub.slug}` : ''}`}>{board.market ? 'Sell' : 'New thread'}</Link>
         </div>

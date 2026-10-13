@@ -13,7 +13,7 @@ Landing page plus an invite-only members forum. Next.js on Vercel, Postgres on N
 
 Members can attach images and GIFs to threads, comments, DMs and chat (button or paste). Every upload is re-encoded to WebP on the server, which strips EXIF/GPS and all other metadata; nothing about the original file or the uploader's IP is kept. Images are served only to signed-in members, and links to images hosted elsewhere stay plain links so nobody's IP leaks to outside servers.
 
-They don't pile up: pictures in a thread's opening post last as long as the thread (or until it vanishes); comment and DM images expire after `MEDIA_DAYS`; chat pictures go with the chat wipe; once the total passes `MEDIA_MAX_MB` the oldest go first (comment and DM images before thread ones); deleting a post deletes its images. The images are stored in Postgres, so there's no extra service to set up.
+They don't pile up: pictures in a thread's opening post last as long as the thread (or until it vanishes); comment and DM images expire after `MEDIA_DAYS`; chat pictures go with the chat wipe; once the total passes `MEDIA_MAX_MB` the oldest go first (comment and DM images before thread ones, pages of zines and books last of all); deleting a post deletes its images. The images are stored in Postgres, so there's no extra service to set up.
 
 ## Forum
 
@@ -45,12 +45,15 @@ Members sell and trade with each other; no money moves through the site. Everyth
 - **Browsing the Market:** categories as chips (with counts), listings photo-first with the price up top, **Sell** always at hand. A listing opens on its photos (swipe through, tap to enlarge; zines open in the page-turner), with the buy box (price, Buy / Offer / Bid, Message) right next to them.
 - **Your market** (avatar menu -> Market, or Your market on any Market page): **Buying** (deals on their way to you, your offers and bids), **Selling** (offers to answer, deals to send, your listings and stock) and **History**. Whatever needs you sits at the top of its tab, with a count on the tab. Each profile shows the member's record (deals, good/bad feedback, unpaid wins), what they're selling, and recent feedback.
 - When something needs you (your step in a deal, or an offer to answer), one line at the top of the Market says so and takes you there.
+- **Every Market post waits for an admin** before anyone else sees it (admins' own posts go straight up). Admins get an alert and work through them in Admin -> Review: Approve, or send it back with a note. The seller hears either way; a post sent back can be fixed and sent again. On approval it goes up as new, and an auction's or vanishing post's clock starts then.
+- **Zines & books to read here:** Market -> Zines & books -> Make your own. Build it page by page (pictures that fill the page or sit whole on paper, with captions; pages of text) or import a PDF (each page comes in as a page, drawn in the browser, so file size doesn't matter). Tall or square pages, up to 120. Free, or for a price: buyers see the first pages, get it through a handshake deal (no shipping), and the rest opens up when the maker confirms payment. It's read in the page-turner, not downloaded. Pages live apart from the post, so a paid one never shows up in search or feeds.
+- **Collection:** zines and books a member got here sit on a shelf on their profile. Settings -> Collection hides it from everyone else.
 - **Auctions** can't check anyone's funds, so they run on track record: bids are binding, a bid in the last 2 minutes adds 2 minutes, sellers can require bidders to have 1+, 3+ or 5+ completed deals, a winner who doesn't pay gets an "unpaid" mark, and the seller can offer the item to the next bidder. Bidders stay anonymous to each other; the seller sees names.
 - **Zines** with sample pages (listed in Market / Zines with two or more pictures) open in a page-turning viewer: spreads on wide screens, single pages on phones, swipe, keys, full screen.
 
 ## Admins
 
-Admin tools (pin, lock, move, delete anything, the Admin pages) show only for admins. **Admin view** in the avatar menu switches them off on that device, to browse like any member; switch it back on there.
+Admin tools (pin, lock, move, delete anything, the Admin pages) show only for admins. Market posts wait in **Admin -> Review** (see Market). **Admin view** in the avatar menu switches the tools off on that device, to browse like any member; switch it back on there.
 
 ## Privacy and safety
 
@@ -74,7 +77,7 @@ On phones a tab bar sits at the bottom: Forum, Chat, **+** (new thread or listin
 | `CHAT_WIPE_HOURS` | Optional. How often the live chat wipes itself (default `24`, resets around 1am Montreal time). |
 | `NEXT_PUBLIC_SITE_URL` | Optional. Defaults to `https://fatcap.club` (QR codes point here). |
 | `MEDIA_DAYS` | Optional. How long comment and DM images last (default `30`). Opening-post images last as long as their thread; chat images go with the chat wipe. |
-| `MEDIA_MAX_MB` | Optional. Total image storage cap (default `200`); past it, the oldest images are dropped. |
+| `MEDIA_MAX_MB` | Optional. Total image storage cap (default `200`); past it, the oldest images are dropped. Zines and books to read here use it too (a 100-page book is roughly 20 to 40 MB), so raise it as they come in. |
 | `GIPHY_API_KEY` | Optional. Turns on GIF search. Free key at developers.giphy.com (create an API app; the starter key is rate-limited, apply for a production key when you outgrow it). |
 | `GIPHY_RATING` | Optional. GIF content rating: `g`, `pg`, `pg-13` (default) or `r`. |
 

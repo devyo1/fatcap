@@ -5,8 +5,8 @@ import { dropMedia } from './media';
 import type { User } from './auth';
 import type { ThreadRow } from '@/components/ThreadRows';
 
-/** A thread that's visible: not deleted, and not past its vanish time. */
-export const LIVE = `NOT t.deleted AND (t.expires_at IS NULL OR t.expires_at > now())`;
+/** A thread anyone can see: not deleted, not waiting for (or turned down in) review, not past its vanish time. */
+export const LIVE = `NOT t.deleted AND t.review IS NULL AND (t.expires_at IS NULL OR t.expires_at > now())`;
 
 /** Not by someone the viewer ($1) has blocked. */
 export const UNBLOCKED = `NOT EXISTS (SELECT 1 FROM blocks bl WHERE bl.blocker_id = $1 AND bl.blocked_id = t.user_id)`;
@@ -15,7 +15,7 @@ export const UNBLOCKED = `NOT EXISTS (SELECT 1 FROM blocks bl WHERE bl.blocker_i
 const COLUMNS = `
   t.id, t.title, t.board, t.topic, u.username AS author, t.reply_count, t.last_post_at, t.created_at, t.pinned, t.locked,
   t.expires_at, t.price, t.status, lst.mode, CASE WHEN lst.mode = 'auction' AND NOT lst.settled THEN lst.ends_at END AS auction_ends,
-  lst.ships, lst.meetup, lst.meetup_area,
+  lst.ships, lst.meetup, lst.meetup_area, lst.format,
   substring(t.body from '\\[img:([A-Za-z0-9_-]{16})\\]') AS cover,
   left(regexp_replace(regexp_replace(t.body, '\\[img:[A-Za-z0-9_-]{16}\\][^\\n]*', '', 'g'), '\\s+', ' ', 'g'), 260) AS excerpt,
   COALESCE(r.read_at < t.last_post_at, t.last_post_at > $2) AS unread,

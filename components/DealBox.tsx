@@ -9,7 +9,7 @@ import Countdown from './Countdown';
 
 export type PendingOffer = { id: number; buyer: string | null; amount_cents: number | null; quantity: number; method: string | null; note: string | null; created_at: string };
 
-const METHOD = { ship: 'Shipping', meetup: 'Meetup' } as const;
+const METHOD = { ship: 'Shipping', meetup: 'Meetup', digital: 'Digital' } as const;
 
 /** "12 deals / all good", "3 deals / 1 bad", "No deals yet" */
 export function repLine(r: Rep) {
@@ -33,15 +33,91 @@ function MethodPicker({ l, name = 'method' }: { l: Listing; name?: string }) {
   );
 }
 
+type ZineInfo = { pages: number; all: boolean; bought: boolean; preview: number } | null;
+
+function Seller({ author, rep }: { author: string | null; rep: Rep }) {
+  return (
+    <div className="deal-seller">
+      <Avatar name={author} size={26} />
+      <span>
+        {author ? <Link className="who" href={`/u/${encodeURIComponent(author)}`}>{author}</Link> : <span className="who">gone</span>}
+        <span className="mono mute">{repLine(rep)}</span>
+      </span>
+    </div>
+  );
+}
+
+/** A digital zine: free (read it), or for a price (the first pages free to look at, then a handshake deal unlocks the rest). */
+function DigitalBox({ thread, l, status, me, rep, myDealId, zine, inReview }: {
+  thread: { id: number; title: string; author: string | null; user_id: number | null };
+  l: Listing; status: string | null; me: User; rep: Rep; myDealId: number | null; zine: ZineInfo; inReview: boolean;
+}) {
+  const own = l.seller_id === me.id;
+  const here = `/forum/t/${thread.id}`;
+  const free = !l.price_cents;
+  const all = zine?.all ?? free;
+  const closed = status === 'closed';
+  const maker = thread.author ?? 'the maker';
+  return (
+    <section className="deal digital" id="buy" aria-label="Zine">
+      <div className="deal-top">
+        <div className="deal-price">
+          <span className="mono mute">{free ? 'Free to read' : 'Price'}</span>
+          <b>{free ? 'Free' : money(l.price_cents!, l.currency)}</b>
+          {!free && !all && zine && <span className="mono mute">First {zine.preview} {zine.preview === 1 ? 'page' : 'pages'} free to look at</span>}
+        </div>
+        <span className="pill mono deal-state">{closed ? 'Closed' : 'Digital'}</span>
+      </div>
+      <div className="deal-actions">
+        {inReview ? <p className="hint mono deal-note">Opens up once it&apos;s approved.</p>
+          : own ? (
+            <>
+              <Link className="btn small" href={`${here}?edit=thread`}>Edit zine</Link>
+              <Link className="btn small" href="/market?tab=selling">Your market</Link>
+              <form action={setListingState}>
+                <input type="hidden" name="id" value={thread.id} /><input type="hidden" name="do" value={closed ? 'reopen' : 'close'} /><input type="hidden" name="back" value={here} />
+                <button className="btn small" type="submit">{closed ? 'Reopen' : 'Stop selling'}</button>
+              </form>
+            </>
+          ) : all ? (
+            <>
+              <a className="btn solid" href="#zine">Read</a>
+              {zine?.bought && <span className="mono mute">Yours.</span>}
+            </>
+          ) : myDealId ? (
+            <p className="notice mono deal-note">Your deal is open. The rest opens up when {maker} confirms your payment. <Link href={`/market?deal=${myDealId}`}>Open it &rarr;</Link></p>
+          ) : !closed && (
+            <details className="deal-pop">
+              <summary className="btn solid">Get it</summary>
+              <form action={buy} className="deal-form">
+                <input type="hidden" name="id" value={thread.id} />
+                <input className="input" name="note" maxLength={300} placeholder={`Note to ${maker} (optional)`} autoComplete="off" />
+                <p className="hint mono">Pay {maker} directly, then mark it paid. When they confirm, the whole zine opens up for you, right here.</p>
+                <button className="btn solid" type="submit">Commit to buy</button>
+              </form>
+            </details>
+          )}
+        {!own && thread.author && !inReview && <Link className="btn" href={`/messages/${encodeURIComponent(thread.author)}?about=${thread.id}`}>Message</Link>}
+      </div>
+      <ul className="deal-facts mono">
+        {zine && <li><span className="mute">Pages</span> {zine.pages}</li>}
+        <li><span className="mute">Read</span> here, nothing to ship</li>
+      </ul>
+      <Seller author={thread.author} rep={rep} />
+    </section>
+  );
+}
+
 /**
  * The sell side of a Market thread: price or current bid, stock, delivery, the seller's record,
  * and the actions. Buyers: buy / offer / bid / message. Seller: offers to answer, bids, close.
  */
-export default function DealBox({ thread, l, status, me, rep, myRep, bids, offers, myOffer, myDealId }: {
+export default function DealBox({ thread, l, status, me, rep, myRep, bids, offers, myOffer, myDealId, zine = null, inReview = false }: {
   thread: { id: number; title: string; author: string | null; user_id: number | null };
   l: Listing; status: string | null; me: User; rep: Rep; myRep: Rep | null;
-  bids: Bid[]; offers: PendingOffer[]; myOffer: PendingOffer | null; myDealId: number | null;
+  bids: Bid[]; offers: PendingOffer[]; myOffer: PendingOffer | null; myDealId: number | null; zine?: ZineInfo; inReview?: boolean;
 }) {
+  if (l.format === 'digital') return <DigitalBox thread={thread} l={l} status={status} me={me} rep={rep} myDealId={myDealId} zine={zine} inReview={inReview} />;
   const own = l.seller_id === me.id;
   const here = `/forum/t/${thread.id}`;
   const left_ = available(l);
@@ -82,8 +158,10 @@ export default function DealBox({ thread, l, status, me, rep, myRep, bids, offer
         </span>
       </div>
 
+      {inReview && !own && <div className="deal-actions"><p className="hint mono deal-note">Opens up once it&apos;s approved.</p></div>}
+
       {/* buyer side */}
-      {!own && (
+      {!own && !inReview && (
         <div className="deal-actions">
           {myDealId && <p className="notice mono deal-note">You have a deal on this. <Link href={`/market?tab=buying#d${myDealId}`}>Open it &rarr;</Link></p>}
           {canBuy && (

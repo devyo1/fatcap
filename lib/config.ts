@@ -32,7 +32,7 @@ export const BOARDS = [
   {
     slug: 'market', name: 'Market', blurb: 'Members only. Deals happen in messages.', market: true,
     subs: [
-      { slug: 'zines', name: 'Zines', blurb: 'Issues, sale or trade.' },
+      { slug: 'zines', name: 'Zines & books', blurb: 'Zines and small books, printed or read here.' },
       { slug: 'goods', name: 'Goods', blurb: 'Prints, clothing, other.' },
       { slug: 'wanted', name: 'Wanted', blurb: 'Looking for.' },
     ],

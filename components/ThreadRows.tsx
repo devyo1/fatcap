@@ -29,6 +29,7 @@ export type ThreadRow = {
   ships?: boolean | null;
   meetup?: boolean | null;
   meetup_area?: string | null;
+  format?: string | null;
   // card view only
   text?: string | null;
   pics?: { id: string; w: number; h: number; a: boolean; c?: string | null }[] | null;

@@ -3,30 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mediaToken, mediaUrl } from '@/lib/media-token';
 import { insertLine, setFieldValue } from '@/lib/dom';
+import { prepare } from '@/lib/upload';
 
-const MAX = 4 * 1024 * 1024;
-const AS_IS = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif']);
 const PER_POST = 6;
-
-/**
- * Big photos (and HEIC from iPhones) get shrunk in the browser first so they fit the upload limit.
- * The server re-encodes everything again anyway, which is what strips metadata.
- */
-async function prepare(file: File): Promise<Blob> {
-  if (AS_IS.has(file.type) && file.size <= MAX) return file;
-  if (file.type === 'image/gif') throw new Error('That GIF is over 4 MB. Try a shorter one.');
-  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => null);
-  if (!bmp) throw new Error("This browser can't read that file. Try a JPG or PNG.");
-  const scale = Math.min(1, 2048 / Math.max(bmp.width, bmp.height));
-  const c = document.createElement('canvas');
-  c.width = Math.round(bmp.width * scale);
-  c.height = Math.round(bmp.height * scale);
-  c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
-  bmp.close();
-  const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/jpeg', 0.88));
-  if (!blob || blob.size > MAX) throw new Error('That image is too big.');
-  return blob;
-}
 
 /**
  * Image / GIF button for a forum or DM composer. Uploads, then writes [img:<id>] on its own line

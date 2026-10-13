@@ -9,7 +9,8 @@ import { MEDIA_ID, mediaIn } from './media-token';
 //   - images in a thread's opening post live as long as the thread (stories and listings keep
 //     their pictures; a vanishing thread takes them with it)
 //   - comment and DM images expire after MEDIA_DAYS; chat pictures go with the chat wipe
-//   - when the total passes MEDIA_MAX_MB, the oldest go first (comment/DM images before thread ones)
+//   - when the total passes MEDIA_MAX_MB, the oldest go first (comment/DM images before thread ones,
+//     digital zine pages last of all)
 //   - deleting a post or message deletes its images
 export const MEDIA_DAYS = Math.max(1, Number(process.env.MEDIA_DAYS) || 30);
 const MAX_TOTAL = Math.max(20, Number(process.env.MEDIA_MAX_MB) || 200) * 1024 * 1024;
@@ -27,7 +28,9 @@ export async function pruneMedia() {
   await q('DELETE FROM media WHERE expires_at <= now()');
   await q(
     `DELETE FROM media WHERE id IN (
-       SELECT id FROM (SELECT id, sum(bytes) OVER (ORDER BY (thread_id IS NOT NULL) DESC, created_at DESC, id) AS running FROM media) x
+       SELECT id FROM (SELECT id, sum(bytes) OVER (
+         ORDER BY (id IN (SELECT media_id FROM zine_pages WHERE media_id IS NOT NULL)) DESC, (thread_id IS NOT NULL) DESC, created_at DESC, id
+       ) AS running FROM media) x
         WHERE running > $1)`,
     [MAX_TOTAL],
   );

@@ -49,3 +49,10 @@ export async function setSave(id: number, on: boolean): Promise<{ on: boolean }>
   else await q('DELETE FROM thread_saves WHERE member_id = $1 AND thread_id = $2', [me.id, n]);
   return { on: !!on };
 }
+
+/** Show (or hide) the zines and books you own on your profile. */
+export async function setCollectionShown(on: boolean): Promise<{ on: boolean }> {
+  const me = await requireUser();
+  await q('UPDATE members SET show_collection = $2 WHERE id = $1', [me.id, !!on]);
+  return { on: !!on };
+}

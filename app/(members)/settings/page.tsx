@@ -6,6 +6,7 @@ import Avatar from '@/components/Avatar';
 import AvatarUpload from '@/components/AvatarUpload';
 import { toggleBlock } from '@/app/social-actions';
 import Notice from '@/components/Notice';
+import CollectionSwitch from '@/components/CollectionSwitch';
 
 export const metadata = { title: 'Edit profile' };
 
@@ -13,7 +14,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
   const me = await requireUser();
   const { error, saved } = await searchParams;
   const [row, pic, blocked] = await Promise.all([
-    one<{ bio: string | null }>('SELECT bio FROM members WHERE id = $1', [me.id]),
+    one<{ bio: string | null; show_collection: boolean }>('SELECT bio, show_collection FROM members WHERE id = $1', [me.id]),
     one('SELECT 1 FROM avatars WHERE member_id = $1', [me.id]),
     q<{ username: string }>('SELECT m.username FROM blocks b JOIN members m ON m.id = b.blocked_id WHERE b.blocker_id = $1 ORDER BY b.created_at DESC', [me.id]),
   ]);
@@ -62,6 +63,14 @@ export default async function Settings({ searchParams }: { searchParams: Promise
             </form>
           </div>
         </section>
+        <section className="box">
+          <div className="bh mono"><span className="br">Collection</span></div>
+          <div className="bb">
+            <CollectionSwitch shown={row?.show_collection ?? true} />
+            <p className="hint mono">Zines and books you get here sit on a shelf on your profile. Off: only you see it.</p>
+          </div>
+        </section>
+
         <section className="box">
           <div className="bh mono"><span className="br">Blocked</span><span className="mute">{blocked.length}</span></div>
           <div className="bb">

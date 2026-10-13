@@ -28,13 +28,16 @@ import { RefreshEvery } from '@/components/Live';
 import Pulse from '@/components/Pulse';
 import ReadingBar from '@/components/ReadingBar';
 import { getListing, bidsFor, reputation, settleAuctions, auctionOpen, type Listing } from '@/lib/market';
-import { updateListing } from '@/app/market-actions';
+import { updateListing, updateZine } from '@/app/market-actions';
+import { approveListing, rejectListing } from '@/app/admin-actions';
+import { zinePages, readsAll } from '@/lib/zines';
+import ZineBuilder, { type BuilderPage } from '@/components/ZineBuilder';
 import { MEDIA_LINE, mediaIn, mediaUrl } from '@/lib/media-token';
 
 type Thread = {
   id: number; board: string; topic: string | null; title: string; body: string; user_id: number | null; author: string | null;
   created_at: string; edited_at: string | null; reply_count: number; pinned: boolean; locked: boolean;
-  expires_at: string | null; price: string | null; status: string | null;
+  expires_at: string | null; price: string | null; status: string | null; review: 'pending' | 'rejected' | null; review_note: string | null;
   props: number; mine: boolean; following: boolean; saved: boolean;
 };
 type Post = {
@@ -183,10 +186,13 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
             COALESCE((SELECT following FROM thread_follows WHERE thread_id = t.id AND member_id = $2), false) AS following,
             EXISTS (SELECT 1 FROM thread_saves WHERE thread_id = t.id AND member_id = $2) AS saved
        FROM threads t LEFT JOIN members u ON u.id = t.user_id
-      WHERE t.id = $1 AND ${LIVE}`,
-    [id, me.id],
+      WHERE t.id = $1 AND NOT t.deleted AND (t.expires_at IS NULL OR t.expires_at > now())
+        AND (t.review IS NULL OR t.user_id = $2 OR $3::boolean)`,
+    [id, me.id, !!me.can_admin],
   );
   if (!thread) notFound();
+  // Waiting for review (or turned down): only the author and the admins get here, and nobody can reply yet.
+  const inReview = !!thread.review;
   const [posts, blockedRows, seen, nearby] = await Promise.all([
     q<Post>(
       `SELECT p.id, p.parent_id, p.body, p.user_id, u.username AS author, p.created_at, p.edited_at, p.deleted,
@@ -263,17 +269,33 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
       ])
     : [null, null, [], [], null, null];
 
-  // Zines with sample pages read like a zine; the pictures leave the text.
-  const pageIds = l && thread.topic === 'zines' ? mediaIn(thread.body) : [];
+  // A digital zine: its pages, all of them or (paid, not bought yet) the free ones and a page saying how many more.
+  const digital = l?.format === 'digital';
   let zine: ZinePage[] = [];
+  let zineInfo: { pages: number; all: boolean; bought: boolean; preview: number } | null = null;
+  let editPages: BuilderPage[] = [];
+  if (l && digital) {
+    const [rows, why] = await Promise.all([zinePages(thread.id), readsAll(me, l, inReview)]);
+    const all = !!why;
+    const shown = all ? rows.length : Math.max(1, Math.min(l.preview_pages, rows.length));
+    zine = rows.slice(0, shown).map((r): ZinePage => (r.kind === 'text'
+      ? { kind: 'text', body: r.body ?? '' }
+      : { kind: 'image', src: r.media_id ? mediaUrl(r.media_id) : '', w: r.w ?? 3, h: r.h ?? 4, fit: r.fit, caption: r.body ?? undefined }));
+    if (shown < rows.length) zine.push({ kind: 'locked', more: rows.length - shown, href: '#buy', price: thread.price ?? undefined });
+    zineInfo = { pages: rows.length, all, bought: why === 'bought', preview: shown };
+    if (editing) editPages = rows.map((r) => (r.kind === 'text' ? { kind: 'text', body: r.body ?? '' } : { kind: 'image', media: r.media_id ?? '', caption: r.body ?? undefined, fit: r.fit }));
+  }
+  // Printed zines with sample pages read like a zine too; the pictures leave the text.
+  const pageIds = l && !digital && thread.topic === 'zines' ? mediaIn(thread.body) : [];
   if (pageIds.length >= 2) {
     const dims = await q<{ id: string; width: number; height: number }>('SELECT id, width, height FROM media WHERE id = ANY($1::text[])', [pageIds]);
     const by = new Map(dims.map((d) => [d.id, d]));
     zine = pageIds.filter((i) => by.has(i)).map((i) => ({ src: mediaUrl(i), w: by.get(i)!.width, h: by.get(i)!.height }));
   }
   // Any other listing with photos shows them first, in a gallery, like a shop would.
-  const gallery: GalleryPic[] = l && zine.length < 2 ? mediaIn(thread.body).filter((i) => media[i]).map((i) => ({ id: i, ...media[i] })) : [];
-  const showcase = !editing && (zine.length >= 2 || gallery.length > 0);
+  const gallery: GalleryPic[] = l && !digital && zine.length < 2 ? mediaIn(thread.body).filter((i) => media[i]).map((i) => ({ id: i, ...media[i] })) : [];
+  const book = digital ? zine.length > 0 : zine.length >= 2;
+  const showcase = !editing && (book || gallery.length > 0);
   const text = showcase ? thread.body.split('\n').filter((line) => !MEDIA_LINE.test(line.trim())).join('\n') : thread.body;
   const cents = (c: number | null) => (c == null ? '' : (c / 100).toFixed(c % 100 ? 2 : 0));
   const next = nearby.rows.filter((t) => t.id !== thread.id).slice(0, market ? 4 : 5);
@@ -302,6 +324,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
     <DealBox
       thread={{ id: thread.id, title: thread.title, author: thread.author, user_id: thread.user_id }}
       l={l} status={thread.status} me={me} rep={rep!} myRep={myRep} bids={bids} offers={offers} myOffer={myOffer} myDealId={myDeal?.id ?? null}
+      zine={zineInfo} inReview={inReview}
     />
   );
 
@@ -316,10 +339,38 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
       {l && !editing ? (
         // A listing: photos (or the zine) first, then what it is and how to get it; side by side on wide screens.
         <div className={`listing-top${showcase ? '' : ' bare'}`}>
-          {showcase && <div className="listing-media">{zine.length >= 2 ? <ZineViewer pages={zine} title={thread.title} /> : <ListingGallery pics={gallery} title={thread.title} />}</div>}
+          {showcase && (
+            <div className="listing-media" id="zine">
+              {book ? <ZineViewer pages={zine} title={thread.title} ratio={digital ? (l.shape === 'square' ? 1 : 1 / 1.414) : undefined} /> : <ListingGallery pics={gallery} title={thread.title} />}
+            </div>
+          )}
           <div className="listing-side">{head}{deal}</div>
         </div>
       ) : head}
+
+      {inReview && (
+        <div className={`review-bar${thread.review === 'rejected' ? ' no' : ''}`}>
+          {thread.review === 'pending' ? (
+            <p className="mono"><b>In review.</b> {own ? 'Only you and the admins can see this until it’s approved. You’ll get an alert.' : 'Waiting for an admin.'}</p>
+          ) : (
+            <p className="mono"><b>Not approved.</b>{thread.review_note ? <> &ldquo;{thread.review_note}&rdquo;</> : null} {own ? 'Edit it to send it again.' : ''}</p>
+          )}
+          {me.can_admin && thread.review === 'pending' && (
+            <div className="review-acts">
+              <form action={approveListing}><input type="hidden" name="id" value={thread.id} /><input type="hidden" name="back" value={here} /><button className="btn solid small" type="submit">Approve</button></form>
+              <details className="pop">
+                <summary className="btn small">Not approved</summary>
+                <form action={rejectListing} className="inline-form review-no">
+                  <input type="hidden" name="id" value={thread.id} /><input type="hidden" name="back" value={here} />
+                  <input className="input" name="note" maxLength={300} placeholder="A note for the seller (optional)" autoComplete="off" />
+                  <button className="btn small danger" type="submit">Send back</button>
+                </form>
+              </details>
+            </div>
+          )}
+          {own && <Link className="btn small" href={`${here}?edit=thread`}>Edit</Link>}
+        </div>
+      )}
 
       <Notice error={sp.error} ok={sp.ok} />
 
@@ -339,7 +390,16 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
           </div>
         )}
 
-        {editing && l ? (
+        {editing && l && digital ? (
+          <ZineBuilder
+            action={updateZine} id={thread.id} submit="Save zine" cancelHref={here} reviewed
+            defaults={{
+              title: thread.title, about: thread.body.split('\n').filter((line) => !MEDIA_LINE.test(line.trim())).join('\n').trim(),
+              price: cents(l.price_cents), currency: l.currency,
+              preview: l.preview_pages, shape: l.shape, pages: editPages,
+            }}
+          />
+        ) : editing && l ? (
           <ListingForm
             action={updateListing} id={thread.id} cancelHref={here} submit="Save listing"
             frozen={l.mode === 'auction' && (bids.length > 0 || l.settled)}
@@ -367,7 +427,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
           <details className="blocked-post"><summary className="mono mute">Posted by a member you blocked. Show anyway</summary><RichText text={text} media={media} /></details>
         ) : <RichText text={text} media={media} />}
 
-        {!editing && (
+        {!editing && !inReview && (
           <div className="acts">
             <LikeButton target="thread" id={thread.id} count={thread.props} mine={thread.mine} />
             {!locked && <QuoteButton target="op" author={thread.author} />}
@@ -403,6 +463,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
 
       <Pulse thread={thread.id} since={new Date().toISOString()} />
       {readingMinutes(thread.body) >= 3 && <ReadingBar target="op" />}
+      {!inReview && (
       <section className="comments" id="comments" aria-label="Comments">
         <div className="comments-head mono">
           <span className="br">{thread.reply_count} {thread.reply_count === 1 ? 'comment' : 'comments'}</span>
@@ -425,6 +486,7 @@ export default async function ThreadPage({ params, searchParams }: { params: Pro
           <p className="empty mono">No comments.</p>
         )}
       </section>
+      )}
 
       {next.length > 0 && (
         <section className="section keep-reading" aria-label={`More in ${placeLabel}`}>

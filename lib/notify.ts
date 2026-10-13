@@ -4,7 +4,9 @@ import { q } from './db';
 export type NotifyKind = 'reply' | 'comment_reply' | 'mention' | 'chat_mention' | 'chat_reply' | 'follow' | 'report'
   // market
   | 'offer' | 'offer_accepted' | 'offer_declined' | 'bought' | 'bid' | 'outbid' | 'won' | 'auction_ended' | 'second_chance'
-  | 'deal_paid' | 'deal_confirmed' | 'deal_sent' | 'deal_complete' | 'deal_cancelled';
+  | 'deal_paid' | 'deal_confirmed' | 'deal_sent' | 'deal_complete' | 'deal_cancelled'
+  // review of Market posts: to admins (review), to the seller (approved / rejected)
+  | 'review' | 'approved' | 'rejected';
 
 /** What an alert points at: a thread/comment, or a chat message. */
 export type NotifyRef = { threadId?: number | null; postId?: number | null; chatId?: number | null; dealId?: number | null };

@@ -8,8 +8,10 @@ import { str } from '@/lib/format';
 import { toCents, isCurrency, money } from '@/lib/money';
 import {
   getListing, available, auctionOpen, nextBid, methods, bidsFor, reputation, syncDisplay, extendIfLate, settleAuctions,
-  STEPS, CANCEL_REASONS, canCancel, AUCTION_DAYS, TRUST_LEVELS, type Mode, type Method, type DealStatus,
+  STEPS, CANCEL_REASONS, canCancel, AUCTION_DAYS, TRUST_LEVELS, DIGITAL_STOCK, type Mode, type Method, type DealStatus,
 } from '@/lib/market';
+import { ZINE, readPages, ownsPictures, savePages } from '@/lib/zines';
+import { mediaIn, mediaToken } from '@/lib/media-token';
 import { notify, idsForNames, type NotifyKind } from '@/lib/notify';
 import { pinThreadMedia } from '@/lib/media';
 import { LIVE } from '@/lib/threads';
@@ -29,6 +31,22 @@ async function liveListing(id: number) {
   const t = await one<{ id: number; title: string; user_id: number | null }>(`SELECT id, title, user_id FROM threads t WHERE id = $1 AND ${LIVE}`, [id]);
   const l = t ? await getListing(id) : null;
   return t && l ? { t, l } : null;
+}
+
+/** The seller's own listing, live or still in review (or turned down), for editing. */
+async function ownListing(id: number, sellerId: number) {
+  const t = await one<{ id: number; title: string; user_id: number | null; review: string | null }>(
+    `SELECT id, title, user_id, review FROM threads t WHERE id = $1 AND user_id = $2 AND NOT t.deleted AND (t.expires_at IS NULL OR t.expires_at > now())`,
+    [id, sellerId],
+  );
+  const l = t ? await getListing(id) : null;
+  return t && l ? { t, l } : null;
+}
+
+/** Every Market post waits for an admin; they hear about it here. */
+async function forReview(actorId: number, threadId: number) {
+  const admins = await q<{ id: number }>('SELECT id FROM members WHERE is_admin AND NOT banned');
+  await notify([{ kind: 'review', ids: admins.map((a) => a.id) }], actorId, { threadId });
 }
 
 type Fields = {
@@ -86,9 +104,11 @@ export async function createListing(form: FormData) {
   if ('error' in f) return fail(path, f.error);
   const expires = vanishFrom(str(form.get('vanish'))) ?? null;
 
+  // Admins' posts go straight up; everyone else's wait for review.
+  const review = me.can_admin ? null : 'pending';
   const t = await one<{ id: number }>(
-    `INSERT INTO threads (city, board, topic, user_id, title, body, expires_at, status) VALUES ($1, $2, $3, $4, $5, $6, $7, 'open') RETURNING id`,
-    [CITY, place!.board, place!.topic, me.id, title, body, expires],
+    `INSERT INTO threads (city, board, topic, user_id, title, body, expires_at, status, review) VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', $8) RETURNING id`,
+    [CITY, place!.board, place!.topic, me.id, title, body, expires, review],
   );
   await q(
     `INSERT INTO listings (thread_id, seller_id, mode, price_cents, currency, accept_offers, quantity, ships, ship_cents, ship_note,
@@ -99,7 +119,8 @@ export async function createListing(form: FormData) {
   );
   await pinThreadMedia(t!.id, body, me.id, expires);
   await q('INSERT INTO thread_follows (member_id, thread_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, t!.id]);
-  await notify([{ kind: 'mention', ids: await idsForNames(mentionsIn(body)) }], me.id, { threadId: t!.id });
+  if (review) await forReview(me.id, t!.id);
+  else await notify([{ kind: 'mention', ids: await idsForNames(mentionsIn(body)) }], me.id, { threadId: t!.id });
   await syncDisplay(t!.id);
   redirect(`/forum/t/${t!.id}`);
 }
@@ -109,8 +130,8 @@ export async function updateListing(form: FormData) {
   const me = await requireUser();
   const id = Number(form.get('id'));
   const path = `/forum/t/${id}?edit=thread`;
-  const found = await liveListing(id);
-  if (!found || found.t.user_id !== me.id) redirect('/forum');
+  const found = await ownListing(id, me.id);
+  if (!found) redirect('/forum');
   const { l } = found!;
   const place = parsePlace(str(form.get('place')));
   if (!place || !isMarket(place.board)) fail(path, 'Select a section.');
@@ -149,6 +170,83 @@ export async function updateListing(form: FormData) {
   }
   await pinThreadMedia(id, body, me.id, expires);
   await syncDisplay(id);
+  if (found!.t.review === 'rejected') {
+    await q(`UPDATE threads SET review = 'pending', review_note = NULL WHERE id = $1`, [id]);
+    await forReview(me.id, id);
+  }
+  redirect(`/forum/t/${id}`);
+}
+
+/* ---------- digital zines ---------- */
+
+type ZineFields = { title: string; about: string; price: number | null; currency: string; preview: number; shape: 'tall' | 'square' };
+
+function readZine(form: FormData): ZineFields | { error: string } {
+  const title = str(form.get('title')).trim();
+  const about = str(form.get('body')).trim();
+  if (!title) return { error: 'Give it a title.' };
+  if (title.length > LIMITS.title || about.length > 2000) return { error: 'Too long.' };
+  return {
+    title, about,
+    price: toCents(str(form.get('price'))) || null,
+    currency: isCurrency(str(form.get('currency'))) ? str(form.get('currency')) : 'CAD',
+    preview: int(form.get('preview'), 1, ZINE.maxPreview, 3),
+    shape: str(form.get('shape')) === 'square' ? 'square' : 'tall',
+  };
+}
+
+/** The post behind a digital zine: its cover (when page one is a picture), then the description. */
+const zinePost = (cover: string | null, about: string) => [cover ? mediaToken(cover) : '', about].filter(Boolean).join('\n\n');
+
+/** Put a digital zine together: pages made here, free or for a price. Goes up once an admin approves it. */
+export async function createZine(form: FormData) {
+  const me = await requireUser();
+  const path = '/forum/market/new?kind=zine';
+  const z = readZine(form);
+  if ('error' in z) return fail(path, z.error);
+  const pages = readPages(str(form.get('pages')));
+  if ('error' in pages) return fail(path, pages.error);
+  if (!(await ownsPictures(me.id, pages))) fail(path, 'One of the pictures is gone. Add it again.');
+  const body = zinePost(pages[0].kind === 'image' ? pages[0].media : null, z.about);
+  const review = me.can_admin ? null : 'pending';
+  const t = await one<{ id: number }>(
+    `INSERT INTO threads (city, board, topic, user_id, title, body, status, review) VALUES ($1, 'market', 'zines', $2, $3, $4, 'open', $5) RETURNING id`,
+    [CITY, me.id, z.title, body, review],
+  );
+  await q(
+    `INSERT INTO listings (thread_id, seller_id, mode, price_cents, currency, quantity, format, shape, preview_pages)
+     VALUES ($1, $2, 'fixed', $3, $4, $5, 'digital', $6, $7)`,
+    [t!.id, me.id, z.price, z.currency, DIGITAL_STOCK, z.shape, z.preview],
+  );
+  await savePages(t!.id, me.id, pages, mediaIn(body));
+  await q('INSERT INTO thread_follows (member_id, thread_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [me.id, t!.id]);
+  await syncDisplay(t!.id);
+  if (review) await forReview(me.id, t!.id);
+  else await notify([{ kind: 'mention', ids: await idsForNames(mentionsIn(z.about)) }], me.id, { threadId: t!.id });
+  redirect(`/forum/t/${t!.id}`);
+}
+
+/** Edit a digital zine's pages and details. A turned-down one goes back for review. */
+export async function updateZine(form: FormData) {
+  const me = await requireUser();
+  const id = Number(form.get('id'));
+  const path = `/forum/t/${id}?edit=thread`;
+  const found = await ownListing(id, me.id);
+  if (!found || found.l.format !== 'digital') redirect('/forum');
+  const z = readZine(form);
+  if ('error' in z) return fail(path, z.error);
+  const pages = readPages(str(form.get('pages')));
+  if ('error' in pages) return fail(path, pages.error);
+  if (!(await ownsPictures(me.id, pages))) fail(path, 'One of the pictures is gone. Add it again.');
+  const body = zinePost(pages[0].kind === 'image' ? pages[0].media : null, z.about);
+  await q('UPDATE threads SET title = $2, body = $3, edited_at = now() WHERE id = $1', [id, z.title, body]);
+  await q('UPDATE listings SET price_cents = $2, currency = $3, shape = $4, preview_pages = $5 WHERE thread_id = $1', [id, z.price, z.currency, z.shape, z.preview]);
+  await savePages(id, me.id, pages, mediaIn(body));
+  await syncDisplay(id);
+  if (found!.t.review === 'rejected') {
+    await q(`UPDATE threads SET review = 'pending', review_note = NULL WHERE id = $1`, [id]);
+    await forReview(me.id, id);
+  }
   redirect(`/forum/t/${id}`);
 }
 
@@ -226,12 +324,15 @@ export async function buy(form: FormData) {
   const found = await liveListing(id);
   if (!found) redirect('/forum');
   const { t, l } = found!;
-  if (l.mode !== 'fixed' || !l.price_cents) fail(path, 'Not for sale at a fixed price.');
+  if (l.mode !== 'fixed' || !l.price_cents) fail(path, l.format === 'digital' ? "It's free. Just read it." : 'Not for sale at a fixed price.');
   if (l.seller_id === me.id) fail(path, "That's your listing.");
   if (await blockedBetween(me.id, l.seller_id)) fail(path, "You can't deal with this member.");
+  if (l.format === 'digital' && await one(`SELECT 1 FROM deals WHERE thread_id = $1 AND buyer_id = $2 AND status <> 'cancelled'`, [id, me.id])) {
+    fail(path, 'You already have this one (or a deal for it is open).');
+  }
   const st = await one<{ status: string | null }>('SELECT status FROM threads WHERE id = $1', [id]);
   if (st?.status === 'closed') fail(path, 'This listing is closed.');
-  const qty = int(form.get('quantity'), 1, 999, 1);
+  const qty = l.format === 'digital' ? 1 : int(form.get('quantity'), 1, 999, 1);
   if (!(await claim(id, qty))) fail(path, qty > 1 ? 'Not enough left.' : 'Sold out.');
   const deal = await openDeal({
     threadId: id, title: t.title, sellerId: l.seller_id!, buyerId: me.id, source: 'buy',

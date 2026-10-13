@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { LIMITS, boardBySlug, subBySlug } from '@/lib/config';
 import { createThread } from '@/app/actions';
-import { createListing } from '@/app/market-actions';
+import { createListing, createZine } from '@/app/market-actions';
+import { requireUser } from '@/lib/auth';
 import ListingForm from '@/components/ListingForm';
+import ZineBuilder from '@/components/ZineBuilder';
 import PlacePicker from '@/components/PlacePicker';
 import VanishPicker from '@/components/VanishPicker';
 import Notice from '@/components/Notice';
@@ -13,25 +15,41 @@ export async function generateMetadata({ params }: { params: Promise<{ board: st
   return { title: boardBySlug((await params).board)?.market ? 'New listing' : 'New thread' };
 }
 
-export default async function NewThread({ params, searchParams }: { params: Promise<{ board: string }>; searchParams: Promise<{ error?: string; in?: string }> }) {
+export default async function NewThread({ params, searchParams }: { params: Promise<{ board: string }>; searchParams: Promise<{ error?: string; in?: string; kind?: string }> }) {
   const board = boardBySlug((await params).board);
   if (!board) notFound();
+  const me = await requireUser();
   const sp = await searchParams;
-  const sub = subBySlug(board.slug, sp.in);
+  const zine = !!board.market && sp.kind === 'zine';
+  const sub = zine ? subBySlug(board.slug, 'zines') : subBySlug(board.slug, sp.in);
   const market = board.market;
+  const back = sub ? `/forum/${board.slug}/${sub.slug}` : `/forum/${board.slug}`;
 
   return (
     <>
       <nav className="crumbs mono" aria-label="Breadcrumb">
         <Link href="/forum">Forum</Link><span>/</span><Link href={`/forum/${board.slug}`}>{board.name}</Link><span>/</span>{sub && <><Link href={`/forum/${board.slug}/${sub.slug}`}>{sub.name}</Link><span>/</span></>}<span>New</span>
       </nav>
-      <div className="page-head"><h1 className="title">{market ? 'New listing' : 'New thread'}</h1></div>
+      <div className="page-head"><h1 className="title">{zine ? 'Make your own' : market ? 'New listing' : 'New thread'}</h1></div>
+      {market && (
+        <nav className="seg-tabs mono new-kind" aria-label="What you're posting">
+          <Link href={`/forum/${board.slug}/new${sub && !zine ? `?in=${sub.slug}` : ''}`} aria-current={zine ? undefined : 'page'} replace>Listing</Link>
+          <Link href={`/forum/${board.slug}/new?kind=zine`} aria-current={zine ? 'page' : undefined} replace>Zine or book</Link>
+        </nav>
+      )}
+      {market && (
+        <p className="mono mute new-kind-hint">
+          {zine ? 'A zine or a small book to read right here: make it page by page, or bring a PDF. Free, or for a price. Nothing to print.' : 'Something to sell, trade or find: a printed zine, prints, clothing, anything.'}
+        </p>
+      )}
       <Notice error={sp.error} />
-      {market ? (
+      {zine ? (
+        <ZineBuilder action={createZine} submit={me.can_admin ? 'Publish' : 'Send for review'} cancelHref={back} reviewed={!!me.can_admin} />
+      ) : market ? (
         <ListingForm
-          action={createListing} submit="Post listing"
+          action={createListing} submit={me.can_admin ? 'Post listing' : 'Send for review'}
           defaults={{ place: sub ? `${board.slug}/${sub.slug}` : '' }}
-          cancelHref={sub ? `/forum/${board.slug}/${sub.slug}` : `/forum/${board.slug}`}
+          cancelHref={back}
         />
       ) : (
       <form action={createThread} className="stack compose-form">

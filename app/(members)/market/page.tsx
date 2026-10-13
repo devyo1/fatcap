@@ -21,14 +21,17 @@ type Deal = {
   cancelled_by: number | null; cancel_reason: string | null;
   buyer_rating: string | null; buyer_note: string | null; seller_rating: string | null; seller_note: string | null;
 };
-type Mine = { id: number; title: string; price: string | null; status: string | null; cover: string | null; mode: string; quantity: number; sold_count: number; currency: string; ends_at: string | null; settled: boolean; offers: number; bids: number };
+type Mine = {
+  id: number; title: string; price: string | null; status: string | null; cover: string | null; mode: string; quantity: number; sold_count: number;
+  currency: string; ends_at: string | null; settled: boolean; offers: number; bids: number; format: string; review: string | null; review_note: string | null;
+};
 type Incoming = { id: number; amount_cents: number | null; quantity: number; method: string | null; note: string | null; created_at: string; buyer: string | null; thread_id: number; title: string; cover: string | null; currency: string };
 type Outgoing = { id: number; kind: 'offer' | 'bid'; amount_cents: number | null; quantity: number; status: string; created_at: string; thread_id: number; title: string; cover: string | null; currency: string; ends_at: string | null; settled: boolean; top: number | null };
 type Tab = 'buying' | 'selling' | 'history';
 
 const COVER = `substring(t.body from '\\[img:([A-Za-z0-9_-]{16})\\]') AS cover`;
 
-const METHOD = { ship: 'Shipping', meetup: 'Meetup' } as const;
+const METHOD = { ship: 'Shipping', meetup: 'Meetup', digital: 'Digital' } as const;
 const REASON: Record<string, string> = { unpaid: "buyer didn't pay", unavailable: 'no longer available', changed: 'changed their mind', other: 'other' };
 const MY_REASON: Record<string, string> = { ...REASON, changed: 'changed your mind' };
 const myTurn = (d: Deal, me: User) => {
@@ -157,8 +160,8 @@ export default async function Market({ searchParams }: { searchParams: Promise<{
       [me.id],
     ),
     q<Mine>(
-      `SELECT t.id, t.title, t.price, t.status, ${COVER},
-              l.mode, l.quantity, l.sold_count, l.currency, l.ends_at, l.settled,
+      `SELECT t.id, t.title, t.price, t.status, ${COVER}, t.review, t.review_note,
+              l.mode, l.quantity, l.sold_count, l.currency, l.ends_at, l.settled, l.format,
               (SELECT count(*) FROM offers WHERE listing_id = t.id AND kind = 'offer' AND status = 'pending')::int AS offers,
               (SELECT count(*) FROM offers WHERE listing_id = t.id AND kind = 'bid')::int AS bids
          FROM listings l JOIN threads t ON t.id = l.thread_id
@@ -306,14 +309,18 @@ export default async function Market({ searchParams }: { searchParams: Promise<{
                       <span className="mk-main">
                         <Link className="mk-title" href={`/forum/t/${m.id}`}>{m.title}</Link>
                         <span className="mono mute">
-                          {m.mode === 'auction' ? (m.settled ? (m.sold_count ? 'Auction sold' : 'Auction ended') : `Auction / ${m.bids} ${m.bids === 1 ? 'bid' : 'bids'} / ${m.ends_at ? `${left(m.ends_at)} left` : ''}`)
+                          {m.review === 'pending' ? <span className="pill">In review</span>
+                            : m.review === 'rejected' ? <span className="pill bad" title={m.review_note ?? undefined}>Not approved</span> : null}
+                          {m.review ? ' ' : ''}
+                          {m.format === 'digital' ? `Read here / ${m.sold_count} ${m.sold_count === 1 ? 'copy' : 'copies'}`
+                            : m.mode === 'auction' ? (m.settled ? (m.sold_count ? 'Auction sold' : 'Auction ended') : `Auction / ${m.bids} ${m.bids === 1 ? 'bid' : 'bids'} / ${m.ends_at ? `${left(m.ends_at)} left` : ''}`)
                             : m.mode === 'wanted' ? 'Wanted' : `${m.sold_count} sold`}
                           {m.offers ? ` / ${m.offers} ${m.offers === 1 ? 'offer' : 'offers'}` : ''}
                           {m.status === 'closed' ? ' / closed' : ''}
                         </span>
                       </span>
                       <span className="inv-price">{m.price}</span>
-                      {(m.mode === 'fixed' || m.mode === 'offers') && (
+                      {(m.mode === 'fixed' || m.mode === 'offers') && m.format !== 'digital' && (
                         <form action={setStock} className="stock-form mono">
                           <input type="hidden" name="id" value={m.id} /><input type="hidden" name="back" value="/market?tab=selling" />
                           <label>Left <input className="input small-num" type="number" inputMode="numeric" name="left" min={0} max={999} defaultValue={left_} /></label>

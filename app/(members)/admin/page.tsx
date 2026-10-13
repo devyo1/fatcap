@@ -4,7 +4,9 @@ import { q, one } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
 import { ago, date } from '@/lib/format';
 import { makeStickers, resetPassword, resolveReport } from '@/app/actions';
-import { banMember, unbanMember, toggleAdmin, wipeMemberPosts, moderate, removeMock, addMock } from '@/app/admin-actions';
+import { banMember, unbanMember, toggleAdmin, wipeMemberPosts, moderate, removeMock, addMock, approveListing, rejectListing } from '@/app/admin-actions';
+import { subBySlug } from '@/lib/config';
+import { mediaUrl } from '@/lib/media-token';
 import Avatar from '@/components/Avatar';
 import Notice from '@/components/Notice';
 import RichText from '@/components/RichText';
@@ -13,6 +15,7 @@ export const metadata = { title: 'Admin' };
 
 const TABS = [
   { id: 'overview', name: 'Overview' },
+  { id: 'review', name: 'Review' },
   { id: 'members', name: 'Members' },
   { id: 'reports', name: 'Reports' },
   { id: 'moderation', name: 'Moderation' },
@@ -195,6 +198,52 @@ async function Moderation({ show }: { show: string }) {
   );
 }
 
+/** Market posts waiting to go up, oldest first. */
+async function Review() {
+  const rows = await q<{ id: number; title: string; board: string; topic: string | null; author: string | null; created_at: string; price: string | null; cover: string | null; format: string | null; mode: string | null; pages: number }>(
+    `SELECT t.id, t.title, t.board, t.topic, u.username AS author, t.created_at, t.price,
+            substring(t.body from '\\[img:([A-Za-z0-9_-]{16})\\]') AS cover, l.format, l.mode,
+            (SELECT count(*)::int FROM zine_pages z WHERE z.thread_id = t.id) AS pages
+       FROM threads t LEFT JOIN members u ON u.id = t.user_id LEFT JOIN listings l ON l.thread_id = t.id
+      WHERE t.review = 'pending' AND NOT t.deleted
+      ORDER BY t.created_at`,
+  );
+  if (!rows.length) return <p className="empty mono">Nothing waiting.</p>;
+  return (
+    <ul className="mod-list review-list">
+      {rows.map((r) => (
+        <li key={r.id}>
+          <div className="mod-who">
+            <Link className="inv-cover" href={`/forum/t/${r.id}`} aria-hidden="true" tabIndex={-1}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {r.cover ? <img src={`${mediaUrl(r.cover)}?w=240&sq=1`} alt="" /> : <span className="cover-blank" />}
+            </Link>
+            <div>
+              <Link className="mk-title" href={`/forum/t/${r.id}`}>{r.title}</Link>
+              <p className="mono mute">
+                {r.author ?? 'gone'} / {subBySlug(r.board, r.topic)?.name ?? r.board} / {r.format === 'digital' ? `to read here, ${r.pages} ${r.pages === 1 ? 'page' : 'pages'}` : r.mode ?? 'listing'}
+                {r.price ? ` / ${r.price}` : ''} / {ago(r.created_at)}
+              </p>
+            </div>
+          </div>
+          <div className="acts">
+            <Link className="btn small" href={`/forum/t/${r.id}`}>Open</Link>
+            <form action={approveListing}><input type="hidden" name="id" value={r.id} /><button className="btn small solid" type="submit">Approve</button></form>
+            <details className="pop">
+              <summary className="btn small">Not approved</summary>
+              <form action={rejectListing} className="inline-form review-no">
+                <input type="hidden" name="id" value={r.id} />
+                <input className="input" name="note" maxLength={300} placeholder="A note for the seller (optional)" autoComplete="off" />
+                <button className="btn small danger" type="submit">Send back</button>
+              </form>
+            </details>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 async function Reports() {
   const rows = await q<{
     id: number; reason: string; note: string | null; created_at: string; reporter: string | null;
@@ -324,7 +373,10 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   const me = await requireAdmin();
   const sp = await searchParams;
   const tab: Tab = (TABS.find((t) => t.id === sp.tab)?.id ?? 'overview') as Tab;
-  const open = (await one<{ n: number }>('SELECT count(*)::int AS n FROM reports WHERE resolved_at IS NULL'))?.n ?? 0;
+  const [open, waiting] = await Promise.all([
+    one<{ n: number }>('SELECT count(*)::int AS n FROM reports WHERE resolved_at IS NULL').then((r) => r?.n ?? 0),
+    one<{ n: number }>(`SELECT count(*)::int AS n FROM threads WHERE review = 'pending' AND NOT deleted`).then((r) => r?.n ?? 0),
+  ]);
   let flash: { user?: string; temp?: string } | null = null;
   try { flash = JSON.parse((await cookies()).get('fc_flash')?.value ?? 'null'); } catch {}
 
@@ -334,7 +386,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         <h1 className="title">Admin</h1>
       </div>
       <nav className="subtabs mono big" aria-label="Admin sections">
-        {TABS.map((t) => <Link key={t.id} href={`/admin?tab=${t.id}`} aria-current={tab === t.id ? 'page' : undefined}>{t.name}{t.id === 'reports' && open ? <span className="count">{open}</span> : null}</Link>)}
+        {TABS.map((t) => <Link key={t.id} href={`/admin?tab=${t.id}`} aria-current={tab === t.id ? 'page' : undefined}>{t.name}{t.id === 'reports' && open ? <span className="count">{open}</span> : null}{t.id === 'review' && waiting ? <span className="count">{waiting}</span> : null}</Link>)}
       </nav>
       <Notice error={sp.error} ok={sp.ok} />
       {flash?.temp && (
@@ -344,6 +396,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       )}
       <div className="section" style={{ marginTop: 22 }}>
         {tab === 'overview' && <Overview />}
+        {tab === 'review' && <Review />}
         {tab === 'members' && <Members search={sp.s ?? ''} meId={me.id} />}
         {tab === 'reports' && <Reports />}
         {tab === 'moderation' && <Moderation show={['live', 'hidden', 'all'].includes(sp.show ?? '') ? sp.show! : 'live'} />}

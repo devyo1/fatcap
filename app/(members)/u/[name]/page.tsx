@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { mediaUrl } from '@/lib/media-token';
 import { notFound } from 'next/navigation';
 import { q, one } from '@/lib/db';
 import { requireUser, usernameKey } from '@/lib/auth';
@@ -15,7 +16,7 @@ import { reputation } from '@/lib/market';
 import { toggleBlock } from '@/app/social-actions';
 
 type Profile = {
-  id: number; username: string; created_at: string; last_seen_at: string | null; is_admin: boolean; bio: string | null;
+  id: number; username: string; created_at: string; last_seen_at: string | null; is_admin: boolean; bio: string | null; show_collection: boolean;
   via_kind: string | null; via_batch: string | null; inviter: string | null;
   threads: number; replies: number; invited: number; props: number;
 };
@@ -30,7 +31,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ name: 
   const name = decodeURIComponent((await params).name);
 
   const p = await one<Profile>(
-    `SELECT u.id, u.username, u.created_at, u.last_seen_at, u.is_admin, u.bio,
+    `SELECT u.id, u.username, u.created_at, u.last_seen_at, u.is_admin, u.bio, u.show_collection,
             i.kind AS via_kind, i.batch AS via_batch, inv.username AS inviter,
             (SELECT count(*)::int FROM threads WHERE user_id = u.id AND NOT deleted) AS threads,
             (SELECT count(*)::int FROM posts WHERE user_id = u.id AND NOT deleted) AS replies,
@@ -49,23 +50,25 @@ export default async function ProfilePage({ params }: { params: Promise<{ name: 
 
   const activity = await q<Activity>(
     `(SELECT 'thread' AS kind, t.id AS thread_id, t.title, t.board, NULL::int AS post_id, t.created_at AS at
-        FROM threads t WHERE t.user_id = $1 AND NOT t.deleted AND (t.expires_at IS NULL OR t.expires_at > now()))
+        FROM threads t WHERE t.user_id = $1 AND NOT t.deleted AND t.review IS NULL AND (t.expires_at IS NULL OR t.expires_at > now()))
      UNION ALL
      (SELECT 'reply', t.id, t.title, t.board, p.id, p.created_at
         FROM posts p JOIN threads t ON t.id = p.thread_id
-       WHERE p.user_id = $1 AND NOT p.deleted AND NOT t.deleted AND (t.expires_at IS NULL OR t.expires_at > now()))
+       WHERE p.user_id = $1 AND NOT p.deleted AND NOT t.deleted AND t.review IS NULL AND (t.expires_at IS NULL OR t.expires_at > now()))
      ORDER BY at DESC LIMIT 25`,
     [p.id],
   );
 
   // Market record: deals, feedback others left, and what they're selling now.
-  const [rep, listings, feedback] = await Promise.all([
+  // Their shelf: zines and books they've got here (a confirmed purchase), newest first. Theirs to hide.
+  const shelfShown = own || p.show_collection;
+  const [rep, listings, feedback, shelf] = await Promise.all([
     reputation(p.id),
     q<ThreadRow>(
       `SELECT t.id, t.title, t.board, t.topic, $2::text AS author, t.reply_count, t.last_post_at, t.created_at, t.price, t.status, t.expires_at,
-              substring(t.body from '\\[img:([A-Za-z0-9_-]{16})\\]') AS cover
+              substring(t.body from '\\[img:([A-Za-z0-9_-]{16})\\]') AS cover, l.mode, l.format, l.ships, l.meetup, l.meetup_area
          FROM listings l JOIN threads t ON t.id = l.thread_id
-        WHERE l.seller_id = $1 AND NOT t.deleted AND (t.expires_at IS NULL OR t.expires_at > now()) AND t.status = 'open'
+        WHERE l.seller_id = $1 AND NOT t.deleted AND t.review IS NULL AND (t.expires_at IS NULL OR t.expires_at > now()) AND t.status = 'open'
         ORDER BY t.created_at DESC LIMIT 8`,
       [p.id, p.username],
     ),
@@ -78,6 +81,14 @@ export default async function ProfilePage({ params }: { params: Promise<{ name: 
         ORDER BY at DESC LIMIT 5`,
       [p.id],
     ),
+    shelfShown ? q<{ id: number; title: string; cover: string | null; maker: string | null; format: string | null }>(
+      `SELECT t.id, t.title, substring(t.body from '\\[img:([A-Za-z0-9_-]{16})\\]') AS cover, s.username AS maker, l.format
+         FROM (SELECT thread_id, max(completed_at) AS got FROM deals WHERE buyer_id = $1 AND status = 'complete' GROUP BY thread_id) d
+         JOIN threads t ON t.id = d.thread_id JOIN listings l ON l.thread_id = t.id LEFT JOIN members s ON s.id = t.user_id
+        WHERE t.topic = 'zines' AND NOT t.deleted
+        ORDER BY d.got DESC NULLS LAST LIMIT 24`,
+      [p.id],
+    ) : Promise.resolve([]),
   ]);
 
   const invite = own ? await memberInvite(me.id) : null;
@@ -149,7 +160,33 @@ export default async function ProfilePage({ params }: { params: Promise<{ name: 
       )}
 
       <div className="grid2 section">
-        <section>
+        {shelfShown && (shelf.length > 0 || own) && (
+        <section className="section">
+          <div className="sec-head mono">
+            <span className="br">Collection</span>
+            <span>{own && !p.show_collection ? <>Only you see this / <Link href="/settings">Settings &rarr;</Link></> : `${shelf.length} ${shelf.length === 1 ? 'zine' : 'zines and books'}`}</span>
+          </div>
+          {shelf.length ? (
+            <ul className="shelf">
+              {shelf.map((z) => (
+                <li key={z.id}>
+                  <Link href={`/forum/t/${z.id}`} className="shelf-item">
+                    <span className="shelf-cover">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {z.cover ? <img src={`${mediaUrl(z.cover)}?w=240`} alt="" loading="lazy" decoding="async" /> : <span className="cover-blank" />}
+                      {z.format === 'digital' && <span className="shelf-tag mono">Read</span>}
+                    </span>
+                    <span className="shelf-t">{z.title}</span>
+                    <span className="shelf-by mono">{z.maker ?? 'gone'}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="empty mono">Zines and books you get here end up on this shelf.</p>}
+        </section>
+      )}
+
+      <section>
           <span className="mono mute br" style={{ display: 'block', marginBottom: 10 }}>Activity</span>
           {activity.length ? (
             <ul className="rows">

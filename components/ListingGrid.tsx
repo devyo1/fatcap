@@ -17,8 +17,9 @@ export default function ListingGrid({ rows, empty, showTopic = false }: { rows: 
     <ul className="listings">
       {rows.map((t) => {
         const sold = t.status === 'sold' || t.status === 'ended' || t.status === 'closed';
-        const tag = t.status === 'sold' ? 'Sold' : t.status === 'ended' ? 'Ended' : t.status === 'closed' ? 'Closed' : t.auction_ends ? `Auction / ${left(t.auction_ends)}` : t.mode === 'wanted' ? 'Wanted' : null;
-        const how = handover(t);
+        const tag = t.status === 'sold' ? 'Sold' : t.status === 'ended' ? 'Ended' : t.status === 'closed' ? 'Closed'
+          : t.auction_ends ? `Auction / ${left(t.auction_ends)}` : t.mode === 'wanted' ? 'Wanted' : t.format === 'digital' ? 'Digital' : null;
+        const how = t.format === 'digital' ? 'Read here' : handover(t);
         return (
           <li key={t.id}>
             <Link className={`listing${sold ? ' sold' : ''}${t.unread ? ' unread' : ''}`} href={`/forum/t/${t.id}`}>

@@ -1,8 +1,22 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import RichText from './RichText';
 
-export type ZinePage = { src: string; w: number; h: number };
+/**
+ * A page: a picture (filling the page, or whole on paper, with an optional caption), a page of
+ * text, or (on a paid zine you haven't bought) the page that says how many more there are.
+ */
+export type ZinePage =
+  | { kind?: 'image'; src: string; w: number; h: number; fit?: 'cover' | 'contain'; caption?: string }
+  | { kind: 'text'; body: string }
+  | { kind: 'locked'; more: number; href: string; price?: string };
+
+const Lock = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+    <rect x="5" y="10.5" width="14" height="10" /><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+  </svg>
+);
 type Turn = { dir: 1 | -1; to: number };
 
 const TURN_MS = 700;
@@ -12,7 +26,7 @@ const TURN_MS = 700;
  * spine (single pages on narrow screens). Tap or click the right / left side, swipe, or use the
  * arrow keys. Thumbnails jump; the expand button opens it full screen.
  */
-export default function ZineViewer({ pages, title }: { pages: ZinePage[]; title: string }) {
+export default function ZineViewer({ pages, title, ratio: shape }: { pages: ZinePage[]; title: string; ratio?: number }) {
   const [wide, setWide] = useState(false);
   const [page, setPage] = useState(0); // first page of the current view
   const [turn, setTurn] = useState<Turn | null>(null);
@@ -78,11 +92,27 @@ export default function ZineViewer({ pages, title }: { pages: ZinePage[]; title:
     return () => { html.style.overflow = before; };
   }, [big]);
 
-  const img = (i: number | undefined) =>
-    i == null || i < 0 || !pages[i] ? <span className="zv-blank" /> : (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={pages[i].src} alt={i === 0 ? `${title}, cover` : `${title}, page ${i + 1}`} draggable={false} />
+  const img = (i: number | undefined) => {
+    const p = i == null || i < 0 ? undefined : pages[i];
+    if (!p) return <span className="zv-blank" />;
+    if (p.kind === 'text') return <div className="zv-text"><RichText text={p.body} className="zv-body" /></div>;
+    if (p.kind === 'locked') {
+      return (
+        <div className="zv-locked">
+          <Lock />
+          <b>{p.more} more {p.more === 1 ? 'page' : 'pages'}</b>
+          <a className="btn solid small" href={p.href} onClick={(e) => e.stopPropagation()}>{p.price ? `Get it, ${p.price}` : 'Get it'}</a>
+        </div>
+      );
+    }
+    return (
+      <figure className={`zv-pic ${p.fit ?? 'cover'}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={p.src} alt={i === 0 ? `${title}, cover` : `${title}, page ${i! + 1}`} draggable={false} />
+        {p.caption && <figcaption className="mono">{p.caption}</figcaption>}
+      </figure>
     );
+  };
 
   // What sits underneath while a leaf turns, and what's printed on each side of the leaf.
   const target = turn ? views[turn.to] : view;
@@ -97,7 +127,8 @@ export default function ZineViewer({ pages, title }: { pages: ZinePage[]; title:
     front = turn.dir === 1 ? view[0] : target[0];
   }
 
-  const ratio = pages[0]?.w && pages[0]?.h ? pages[0].w / pages[0].h : 3 / 4;
+  const first = pages[0];
+  const ratio = shape ?? (first && (!first.kind || first.kind === 'image') && first.w && first.h ? first.w / first.h : 3 / 4);
   const label = wide
     ? view.filter((i) => i >= 0).map((i) => (i === 0 ? 'Cover' : i + 1)).join('-')
     : page === 0 ? 'Cover' : String(page + 1);
@@ -150,8 +181,10 @@ export default function ZineViewer({ pages, title }: { pages: ZinePage[]; title:
             key={i} type="button" role="tab" aria-selected={view.includes(i)} aria-label={i === 0 ? 'Cover' : `Page ${i + 1}`}
             className={view.includes(i) ? 'on' : ''} onClick={() => { if (!turn) setPage(i); }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.src} alt="" loading="lazy" />
+            {p.kind === 'text' ? <span className="zv-thumb-text" aria-hidden="true">Aa</span>
+              : p.kind === 'locked' ? <span className="zv-thumb-lock" aria-hidden="true"><Lock /></span>
+              // eslint-disable-next-line @next/next/no-img-element
+              : <img src={p.src} alt="" loading="lazy" />}
           </button>
         ))}
       </div>
